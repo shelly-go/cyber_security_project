@@ -1,6 +1,6 @@
 import socket
 
-from consts import CONNECTION_TIMEOUT
+from server.consts import CONNECTION_TIMEOUT
 from exceptions import SocketCloseException, SocketRecvException, SocketSendException
 
 
