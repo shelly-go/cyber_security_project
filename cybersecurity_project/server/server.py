@@ -1,19 +1,8 @@
 import http.server
 import ssl
-from http import HTTPStatus
 
+from server.api_handler import Handler
 from server.consts import HOST, PORT, SSL_CERT_PATH, SSL_PRIV_KEY_PATH
-
-
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        print("Path:", self.path)
-        data = "{'data': 'hi'}"
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-type", 'application/json')
-        self.send_header("Content-Length", str(data))
-        super().end_headers()
-        self.wfile.write(data.encode())
 
 
 class Server:
