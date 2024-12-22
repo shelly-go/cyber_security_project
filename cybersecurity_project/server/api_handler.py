@@ -5,8 +5,20 @@ from http import HTTPStatus
 from typing import Dict
 from urllib.parse import urlparse
 
+from server.client_data import ClientData
+from server.utils import generate_otp, hash_otp, send_by_secure_channel
+
+PHONE_NUMBER_FIELD = 'phone_number'
+OTP_FIELD = 'otp_hash'
+CA_FIELD = 'ca'
+
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clients = dict()
+
     def extract_uri(self):
         return re.sub(r'/+', '/', urlparse(self.path).path).rstrip('/') or '/'
 
@@ -14,7 +26,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # URI mapping for different API endpoints
         mapping = {
             "/": self.api_root,
-            "/signup": self.api_signup,
+            "/register/number": self.api_register_number,
+            "/register/otp": self.api_register_otp,
+            "/register/ca": self.api_register_ca,
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -52,7 +66,39 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
         return {"error": str(err) if err else "Unspecified"}
 
-    def api_signup(self, input_data: Dict) -> Dict:
+    def api_register_number(self, input_data: Dict) -> Dict:
+        self.send_response(HTTPStatus.OK)
+        number = input_data.get(PHONE_NUMBER_FIELD)
+        if number is None:
+            raise Exception("Phone number is required for registration")
+
+        if self.clients.get(number) is not None:
+            raise Exception("Phone number already exists.")
+
+        otp = generate_otp()
+        client = ClientData(phone_number=number, otp_hash=hash_otp(otp))
+        self.clients[number] = client
+
+        send_by_secure_channel(otp)
+        return {OTP_FIELD: otp}
+
+    def api_register_otp(self, input_data: Dict) -> Dict:
+        self.send_response(HTTPStatus.OK)
+        number = input_data.get(PHONE_NUMBER_FIELD)
+        otp_hash = input_data.get(PHONE_NUMBER_FIELD)
+        if number is None or otp_hash is None:
+            raise Exception("Phone number and otp hash are required.")
+
+        client = self.clients.get(number)
+        if client is None:
+            raise Exception("Phone number does not exist.")
+
+        if otp_hash != client.otp_hash:
+            raise Exception("Incorrect otp.")
+
+        return {}
+
+    def api_register_ca(self, input_data: Dict) -> Dict:
         self.send_response(HTTPStatus.OK)
         return input_data
 

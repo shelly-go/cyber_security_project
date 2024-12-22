@@ -5,11 +5,10 @@ from typing import List
 @dataclass
 class ClientData:
     phone_number: str
-    messages: List[bytes]
-    identity_key: bytes
-    signed_key: bytes
-    one_time_keys: List[bytes]
+    messages: List[bytes] = None
+    identity_key: bytes = None
+    signed_key: bytes = None
+    one_time_keys: List[bytes] = None
 
-
-
-
+    otp_hash: str = None
+    ca: bytes = None
