@@ -2,7 +2,7 @@ import logging
 from typing import Tuple
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
@@ -59,3 +59,12 @@ class CryproHelper:
             pub_key_data = f.read()
         public_key = load_pem_public_key(pub_key_data)
         return public_key
+
+    @staticmethod
+    def hash_with_sha256(data: bytes) -> str:
+        logger.debug("Hashing data using SHA256")
+        digest = hashes.Hash(hashes.SHA256())
+        digest.update(data)
+        hash_value = digest.finalize()
+
+        return hash_value.hex()

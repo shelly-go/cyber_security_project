@@ -1,4 +1,5 @@
 import json
+import logging
 import ssl
 from http.client import HTTPResponse
 from urllib import request
@@ -14,6 +15,7 @@ class RequestHandler:
     def __init__(self, server_url=SERVER_URL):
         self.server_url = server_url
         self.ssl_context = self.get_ssl_context(SERVER_CERT_PATH)
+        self.logger = logging.getLogger()
 
     @staticmethod
     def get_ssl_context(cert_file):
@@ -39,10 +41,14 @@ class RequestHandler:
 
             url = urljoin(self.server_url, endpoint)
             response: HTTPResponse = request.urlopen(url, data=data, context=self.ssl_context)
-            return response.read().decode()
+            return json.loads(response.read()), response.status
         except URLError as e:
             if isinstance(e.reason, ssl.SSLCertVerificationError):
-                print("CRITICAL: Server's certificate is not the one we have!")
+                self.logger.critical("Server's certificate is not the one we have!")
                 exit(1)
             else:
-                print(f"Error: {e}")
+                self.logger.critical(f"An error occurred while requesting: {e}")
+                raise e
+        except Exception as e:
+            self.logger.critical(f"An error occurred while requesting: {e}")
+            raise e

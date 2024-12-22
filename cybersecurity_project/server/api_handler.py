@@ -5,19 +5,21 @@ from http import HTTPStatus
 from typing import Dict
 from urllib.parse import urlparse
 
+from common.crypto import CryproHelper
 from server.client_data import ClientData
-from server.utils import generate_otp, hash_otp, send_by_secure_channel
+from server.utils import generate_otp, send_by_secure_channel
 
 PHONE_NUMBER_FIELD = 'phone_number'
-OTP_FIELD = 'otp_hash'
+OTP_FIELD = 'otp'
+OTP_HASH_FIELD = 'otp_hash'
 CA_FIELD = 'ca'
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.clients = dict()
+        super().__init__(*args, **kwargs)
 
     def extract_uri(self):
         return re.sub(r'/+', '/', urlparse(self.path).path).rstrip('/') or '/'
@@ -49,7 +51,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             err = repr(e)
         finally:
-            if data_json is None or err:
+            if err or data_json is None:
                 data_json = self.api_error(err=err)
 
         data = json.dumps(data_json).encode()
@@ -67,7 +69,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return {"error": str(err) if err else "Unspecified"}
 
     def api_register_number(self, input_data: Dict) -> Dict:
-        self.send_response(HTTPStatus.OK)
         number = input_data.get(PHONE_NUMBER_FIELD)
         if number is None:
             raise Exception("Phone number is required for registration")
@@ -76,16 +77,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             raise Exception("Phone number already exists.")
 
         otp = generate_otp()
-        client = ClientData(phone_number=number, otp_hash=hash_otp(otp))
+        otp_hash = CryproHelper.hash_with_sha256(otp.encode())
+        client = ClientData(phone_number=number, otp_hash=otp_hash)
         self.clients[number] = client
 
-        send_by_secure_channel(otp)
-        return {OTP_FIELD: otp}
+        send_by_secure_channel(number, otp)
+        self.send_response(HTTPStatus.OK)
+        return {PHONE_NUMBER_FIELD: number, OTP_FIELD: otp}
 
     def api_register_otp(self, input_data: Dict) -> Dict:
-        self.send_response(HTTPStatus.OK)
         number = input_data.get(PHONE_NUMBER_FIELD)
-        otp_hash = input_data.get(PHONE_NUMBER_FIELD)
+        otp_hash = input_data.get(OTP_HASH_FIELD)
         if number is None or otp_hash is None:
             raise Exception("Phone number and otp hash are required.")
 
@@ -96,7 +98,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if otp_hash != client.otp_hash:
             raise Exception("Incorrect otp.")
 
-        return {}
+        self.send_response(HTTPStatus.OK)
+        return {"status": "ok"}
 
     def api_register_ca(self, input_data: Dict) -> Dict:
         self.send_response(HTTPStatus.OK)

@@ -1,12 +1,10 @@
+import random
+import string
+
+
 def generate_otp() -> str:
-    # TODO
-    return "111111"
+    return ''.join([random.choice(string.digits) for _ in range(6)])
 
 
-def hash_otp(otp: str) -> str:
-    # TODO
-    return "222222"
-
-
-def send_by_secure_channel(message):
-    print(f"Sending by secure channel: {message}")
+def send_by_secure_channel(number, message):
+    print(f"##########\nSending by secure channel to {number}: {message}\n##########")
