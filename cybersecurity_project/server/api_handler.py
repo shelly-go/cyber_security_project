@@ -1,7 +1,6 @@
 import http.server
 import json
 import re
-import traceback
 from http import HTTPStatus
 from typing import Dict
 from urllib.parse import urlparse
@@ -9,7 +8,7 @@ from urllib.parse import urlparse
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def extract_uri(self):
-        return re.sub(r'/+', '/', urlparse(self.path).path).rstrip('/')
+        return re.sub(r'/+', '/', urlparse(self.path).path).rstrip('/') or '/'
 
     def find_request_api_handler(self, uri):
         # URI mapping for different API endpoints
@@ -21,7 +20,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         handler = mapping.get(uri) or self.api_not_implemented
         return handler
 
-    def do_GET(self):
+    def do_POST(self):
         uri = self.extract_uri()
         self.log_message("Received API request for %s", uri)
         handler = self.find_request_api_handler(uri=uri)
@@ -29,30 +28,34 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         data_json = None
         err = None
         try:
-            data_json = handler()
+            content_length = int(self.headers['Content-Length'])
+            incoming_data = self.rfile.read(content_length).decode() or "{}"
+            incoming_data_json = json.loads(incoming_data)
+            data_json = handler(incoming_data_json)
         except Exception as e:
             err = repr(e)
         finally:
-            if not data_json or err:
-                data_json = self.api_error(err)
+            if data_json is None or err:
+                data_json = self.api_error(err=err)
 
-        data = json.dumps(data_json)
+        data = json.dumps(data_json).encode()
         self.send_header("Content-type", 'application/json')
         self.send_header("Content-Length", str(len(data)))
-        super().end_headers()
-        self.wfile.write(data.encode())
+        self.end_headers()
+        self.wfile.write(data)
 
-    def api_not_implemented(self) -> Dict:
+    def api_not_implemented(self, input_data: Dict) -> Dict:
         self.send_response(HTTPStatus.NOT_IMPLEMENTED)
         return {"error": "Not implemented!"}
 
-    def api_error(self, err=None) -> Dict:
+    def api_error(self, input_data: Dict = None, err=None) -> Dict:
         self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
         return {"error": str(err) if err else "Unspecified"}
 
-    def api_signup(self) -> Dict:
-        raise ZeroDivisionError("test")
-        return self.api_not_implemented()
+    def api_signup(self, input_data: Dict) -> Dict:
+        self.send_response(HTTPStatus.OK)
+        return input_data
 
-    def api_root(self) -> Dict:
+    def api_root(self, input_data: Dict = None) -> Dict:
+        self.send_response(HTTPStatus.OK)
         return {"status": "ok"}
