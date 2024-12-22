@@ -3,7 +3,8 @@ from client.client import Client
 
 def main():
     client = Client()
-    client.connect()
+    client.set_up_communication()
+    client.start_communication()
 
 
 if __name__ == '__main__':

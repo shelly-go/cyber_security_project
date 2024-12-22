@@ -1,0 +1,61 @@
+import logging
+from typing import Tuple
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
+from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
+
+logger = logging.getLogger()
+
+
+class CryproHelper:
+    @staticmethod
+    def generate_key_pair() -> Tuple[RSAPrivateKey, RSAPublicKey]:
+        # Generate a new RSA key pair
+        logger.debug("Generating new RSA private key")
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()
+        )
+        logger.debug("Getting RSA public key")
+        public_key = private_key.public_key()
+
+        return private_key, public_key
+
+    @staticmethod
+    def priv_key_to_file(private_key, file_path):
+        logger.debug("Saving RSA private key to file")
+        private_key_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption())
+        with open(file_path, 'wb') as f:
+            f.write(private_key_pem)
+
+    @staticmethod
+    def pub_key_to_file(public_key, file_path):
+        logger.debug("Saving RSA public key to file")
+        public_key_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo)
+        with open(file_path, 'wb') as f:
+            f.write(public_key_pem)
+
+    @staticmethod
+    def load_private_key(priv_key_file_path):
+        logger.debug("Loading RSA private key from file")
+        with open(priv_key_file_path, 'rb') as f:
+            priv_key_data = f.read()
+        private_key = load_pem_private_key(priv_key_data, password=None, backend=default_backend())
+        return private_key
+
+    @staticmethod
+    def load_public_key(pub_key_file_path):
+        logger.debug("Loading RSA public key from file")
+        with open(pub_key_file_path, 'rb') as f:
+            pub_key_data = f.read()
+        public_key = load_pem_public_key(pub_key_data)
+        return public_key
