@@ -2,7 +2,6 @@ import http.server
 import logging
 import ssl
 import sys
-from functools import partial
 
 from server.api_handler import APIHandler
 from server.consts import HOST, PORT, SSL_CERT_PATH, SSL_PRIV_KEY_PATH, STARTUP_BANNER
@@ -32,8 +31,7 @@ class Server:
         print(f"Serving on {self.host}:{self.port}")
 
         server_address = (self.host, self.port)
-        handler = partial(APIHandler, api_clients=self.api_clients)
-        httpd = http.server.ThreadingHTTPServer(server_address, handler)
+        httpd = http.server.ThreadingHTTPServer(server_address, APIHandler)
 
         context = self.get_ssl_context(SSL_CERT_PATH, SSL_PRIV_KEY_PATH)
         httpd.socket = context.wrap_socket(httpd.socket, server_side=True)

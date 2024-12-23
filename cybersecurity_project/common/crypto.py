@@ -30,24 +30,24 @@ class CryptoHelper:
         return private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption())
+            encryption_algorithm=serialization.NoEncryption()).decode()
 
     @staticmethod
     def priv_key_to_file(private_key, file_path):
         logger.debug("Saving RSA private key to file")
-        with open(file_path, 'wb') as f:
+        with open(file_path, 'w') as f:
             f.write(CryptoHelper.priv_key_to_str(private_key))
 
     @staticmethod
     def pub_key_to_str(public_key):
         return public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo)
+            format=serialization.PublicFormat.SubjectPublicKeyInfo).decode()
 
     @staticmethod
     def pub_key_to_file(public_key, file_path):
         logger.debug("Saving RSA public key to file")
-        with open(file_path, 'wb') as f:
+        with open(file_path, 'w') as f:
             f.write(CryptoHelper.pub_key_to_str(public_key))
 
     @staticmethod

@@ -3,7 +3,7 @@ import logging
 import ssl
 from http.client import HTTPResponse
 from urllib import request
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin
 
 from client.consts import SERVER_URL
@@ -42,6 +42,8 @@ class RequestHandler:
             url = urljoin(self.server_url, endpoint)
             response: HTTPResponse = request.urlopen(url, data=data, context=self.ssl_context)
             return json.loads(response.read()), response.status
+        except HTTPError as e:
+            return {"error": e.msg}, e.status
         except URLError as e:
             if isinstance(e.reason, ssl.SSLCertVerificationError):
                 self.logger.critical("Server's certificate is not the one we have!")

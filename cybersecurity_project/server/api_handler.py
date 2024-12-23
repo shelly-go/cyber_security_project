@@ -3,27 +3,27 @@ import json
 import logging
 import re
 from http import HTTPStatus
-from typing import Dict
+from typing import Dict, Callable
 from urllib.parse import urlparse
 
 from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, PUB_ID_KEY_FIELD, SIGNED_KEY_FIELD, \
     ONETIME_KEYS_FIELD
 from common.crypto import CryptoHelper
-from server.client_data import ClientData
+from server.client_handler import ClientData, ClientHandler
 from server.utils import generate_otp, send_by_secure_channel
 
 
 class APIHandler(http.server.SimpleHTTPRequestHandler):
 
-    def __init__(self, api_clients, *args, **kwargs):
-        self.api_clients = api_clients
+    def __init__(self, *args, **kwargs):
+        self.api_clients = ClientHandler()
         self.logger = logging.getLogger()
         super().__init__(*args, **kwargs)
 
     def extract_uri(self):
         return re.sub(r'/+', '/', urlparse(self.path).path).rstrip('/') or '/'
 
-    def find_request_api_handler(self, uri):
+    def find_request_api_handler(self, uri) -> Callable[[dict], dict]:
         # URI mapping for different API endpoints
         self.logger.debug(f'Getting handler function for uri: "{uri}"')
         mapping = {
@@ -51,10 +51,11 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             data_json = handler(incoming_data_json)
         except Exception as e:
             self.logger.error(f"Failed to handle request with error: {e}")
-            err = repr(e)
+            err = e
         finally:
             if err or data_json is None:
-                data_json = self.api_error(err=err)
+                error_response = {"error": repr(err) if err else "Unspecified"}
+                data_json = self.api_error(error_response)
 
         data = json.dumps(data_json).encode()
         self.send_header("Content-type", 'application/json')
@@ -66,22 +67,23 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(HTTPStatus.NOT_IMPLEMENTED)
         return {"error": "Not implemented!"}
 
-    def api_error(self, input_data: Dict = None, err=None) -> Dict:
+    def api_error(self, input_data: Dict = None) -> Dict:
         self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
-        return {"error": str(err) if err else "Unspecified"}
+        return input_data
 
     def api_register_number(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
-        if number is None:
+        if not number:
             raise Exception("Phone number is required for registration")
 
-        if self.api_clients.get(number) is not None:
+        client_data = self.api_clients.get_client(number)
+        if client_data and client_data.registration_complete:
             raise Exception("Phone number already exists.")
 
         otp = generate_otp()
         otp_hash = CryptoHelper.hash_with_sha256(otp.encode())
-        client = ClientData(phone_number=number, otp_hash=otp_hash)
-        self.api_clients[number] = client
+        client_data = ClientData(phone_number=number, otp_hash=otp_hash)
+        self.api_clients.update_client(number, client_data)
 
         send_by_secure_channel(number, otp)
         self.send_response(HTTPStatus.OK)
@@ -91,17 +93,19 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         number = input_data.get(PHONE_NUMBER_FIELD)
         otp_hash = input_data.get(OTP_HASH_FIELD)
         id_key = input_data.get(PUB_ID_KEY_FIELD)
-        if number is None or otp_hash is None or id_key is None:
+        if not (number and otp_hash) or not id_key:
             raise Exception("Phone number, otp hash, and ID key are required.")
 
-        client = self.api_clients.get(number)
-        if client is None:
+        client_data = self.api_clients.get_client(number)
+        if not client_data:
             raise Exception("Phone number does not exist.")
 
-        if otp_hash != client.otp_hash:
+        if otp_hash != client_data.otp_hash:
             raise Exception(f"Incorrect otp for number {number}.")
 
-        client.identity_key = id_key
+        client_data.identity_key = id_key
+        client_data.registration_complete = True
+        self.api_clients.update_client(number, client_data)
 
         self.send_response(HTTPStatus.OK)
         return {"status": "ok"}
@@ -112,22 +116,23 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         signed_key = input_data.get(SIGNED_KEY_FIELD)
         onetime_keys = input_data.get(ONETIME_KEYS_FIELD)
 
-        if number is None or otp_hash is None or signed_key is None or onetime_keys is None:
+        if not (number and otp_hash and signed_key and onetime_keys):
             raise Exception("Phone number, id key, signed key and one-time keys are required.")
 
-        client = self.api_clients.get(number)
-        if client is None:
+        client_data = self.api_clients.get_client(number)
+        if not client_data:
             raise Exception("Phone number does not exist.")
 
-        if otp_hash != client.otp_hash:
+        if otp_hash != client_data.otp_hash:
             raise Exception(f"Incorrect otp for number {number}.")
 
-        client.signed_key = signed_key
-        client.one_time_keys = onetime_keys
+        client_data.signed_key = signed_key
+        client_data.one_time_keys = onetime_keys
+        self.api_clients.update_client(number, client_data)
 
         self.send_response(HTTPStatus.OK)
         return {"status": "ok"}
 
-    def api_root(self, input_data: Dict = None) -> Dict:
+    def api_root(self, input_data: Dict) -> Dict:
         self.send_response(HTTPStatus.OK)
         return {"status": "ok"}

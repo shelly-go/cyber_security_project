@@ -54,7 +54,7 @@ class Client:
         priv_id_key, pub_id_key = CryptoHelper.generate_key_pair()
 
         otp = self.server_api.server_request_otp()
-        if not self.server_api.server_submit_otp_with_id_key(otp):
+        if not self.server_api.server_submit_otp_with_id_key(otp, pub_id_key):
             self.logger.critical("Client cannot receive valid OTP from server, exiting...")
             exit(1)
 
