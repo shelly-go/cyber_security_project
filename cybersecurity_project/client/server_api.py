@@ -1,7 +1,10 @@
 import logging
 from http import HTTPStatus
 
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+
 from client.request_handler import RequestHandler
+from common.api_consts import OTP_HASH_FIELD, PUB_ID_KEY_FIELD, PHONE_NUMBER_FIELD
 from common.crypto import CryptoHelper
 
 
@@ -13,7 +16,7 @@ class ServerAPI:
 
     def server_request_otp(self):
         self.logger.info(f"Requesting OTP for {self.client.phone_num}")
-        request_data = {'phone_number': self.client.phone_num}
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num}
         response_data, response_code = self.request_handler.request('/register/number',
                                                                     data=request_data)
         if not response_code == HTTPStatus.OK:
@@ -25,11 +28,12 @@ class ServerAPI:
         self.logger.info(f"##########\nReceived via secure channel to {self.client.phone_num}: {otp}\n##########")
         return otp
 
-    def server_submit_otp(self, otp):
+    def server_submit_otp_with_id_key(self, otp, pub_id_key: RSAPublicKey):
         self.logger.info("Submitting the received OTP")
         otp_hash = CryptoHelper.hash_with_sha256(otp.encode())
-        request_data = {'phone_number': self.client.phone_num,
-                        'otp_hash': otp_hash}
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
+                        OTP_HASH_FIELD: otp_hash,
+                        PUB_ID_KEY_FIELD: CryptoHelper.pub_key_to_str(pub_id_key)}
         response_data, response_code = self.request_handler.request('/register/otp',
                                                                     data=request_data)
         if not response_code == HTTPStatus.OK:

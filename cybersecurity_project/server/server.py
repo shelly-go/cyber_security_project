@@ -4,7 +4,7 @@ import ssl
 import sys
 from functools import partial
 
-from server.api_handler import Handler
+from server.api_handler import APIHandler
 from server.consts import HOST, PORT, SSL_CERT_PATH, SSL_PRIV_KEY_PATH, STARTUP_BANNER
 
 
@@ -19,7 +19,7 @@ class Server:
         print(STARTUP_BANNER)
         self.host = HOST
         self.port = PORT
-        self.clients = dict()
+        self.api_clients = dict()
 
     @staticmethod
     def get_ssl_context(cert_file, key_file):
@@ -32,7 +32,7 @@ class Server:
         print(f"Serving on {self.host}:{self.port}")
 
         server_address = (self.host, self.port)
-        handler = partial(Handler, clients=self.clients)
+        handler = partial(APIHandler, api_clients=self.api_clients)
         httpd = http.server.ThreadingHTTPServer(server_address, handler)
 
         context = self.get_ssl_context(SSL_CERT_PATH, SSL_PRIV_KEY_PATH)

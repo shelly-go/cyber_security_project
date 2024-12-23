@@ -1,0 +1,6 @@
+PHONE_NUMBER_FIELD = 'phone_number'
+OTP_FIELD = 'otp'
+OTP_HASH_FIELD = 'otp_hash'
+PUB_ID_KEY_FIELD = 'pub_id_key'
+SIGNED_KEY_FIELD = 'signed_key'
+ONETIME_KEYS_FIELD = 'one_time_keys'
