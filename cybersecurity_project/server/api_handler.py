@@ -1,11 +1,12 @@
 import http.server
 import json
+import logging
 import re
 from http import HTTPStatus
 from typing import Dict
 from urllib.parse import urlparse
 
-from common.crypto import CryproHelper
+from common.crypto import CryptoHelper
 from server.client_data import ClientData
 from server.utils import generate_otp, send_by_secure_channel
 
@@ -21,6 +22,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, clients, *args, **kwargs):
         self.clients = clients
+        self.logger = logging.getLogger()
         super().__init__(*args, **kwargs)
 
     def extract_uri(self):
@@ -28,6 +30,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def find_request_api_handler(self, uri):
         # URI mapping for different API endpoints
+        self.logger.debug(f'Getting handler function for uri: "{uri}"')
         mapping = {
             "/": self.api_root,
             "/register/number": self.api_register_number,
@@ -39,7 +42,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         uri = self.extract_uri()
-        self.log_message("Received API request for %s", uri)
+        # self.log_message("Received API request for %s", uri)
+        self.logger.info(f"Received API request for {uri}")
         handler = self.find_request_api_handler(uri=uri)
 
         data_json = None
@@ -47,9 +51,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             content_length = int(self.headers['Content-Length'])
             incoming_data = self.rfile.read(content_length).decode() or "{}"
+            self.logger.debug(f"Request length: {content_length}, request body: {incoming_data}")
             incoming_data_json = json.loads(incoming_data)
             data_json = handler(incoming_data_json)
         except Exception as e:
+            self.logger.error(f"Failed to handle request with error: {e}")
             err = repr(e)
         finally:
             if err or data_json is None:
@@ -78,7 +84,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             raise Exception("Phone number already exists.")
 
         otp = generate_otp()
-        otp_hash = CryproHelper.hash_with_sha256(otp.encode())
+        otp_hash = CryptoHelper.hash_with_sha256(otp.encode())
         client = ClientData(phone_number=number, otp_hash=otp_hash)
         self.clients[number] = client
 

@@ -10,7 +10,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key, l
 logger = logging.getLogger()
 
 
-class CryproHelper:
+class CryptoHelper:
     @staticmethod
     def generate_key_pair() -> Tuple[RSAPrivateKey, RSAPublicKey]:
         # Generate a new RSA key pair

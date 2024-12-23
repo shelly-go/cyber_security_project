@@ -2,7 +2,7 @@ import logging
 from http import HTTPStatus
 
 from client.request_handler import RequestHandler
-from common.crypto import CryproHelper
+from common.crypto import CryptoHelper
 
 
 class ServerAPI:
@@ -27,7 +27,7 @@ class ServerAPI:
 
     def server_submit_otp(self, otp):
         self.logger.info("Submitting the received OTP")
-        otp_hash = CryproHelper.hash_with_sha256(otp.encode())
+        otp_hash = CryptoHelper.hash_with_sha256(otp.encode())
         request_data = {'phone_number': self.client.phone_num,
                         'otp_hash': otp_hash}
         response_data, response_code = self.request_handler.request('/register/otp',

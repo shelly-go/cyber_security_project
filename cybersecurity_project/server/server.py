@@ -1,14 +1,22 @@
 import http.server
+import logging
 import ssl
+import sys
+from functools import partial
 
 from server.api_handler import Handler
-from server.consts import HOST, PORT, SSL_CERT_PATH, SSL_PRIV_KEY_PATH
-
-from functools import partial
+from server.consts import HOST, PORT, SSL_CERT_PATH, SSL_PRIV_KEY_PATH, STARTUP_BANNER
 
 
 class Server:
     def __init__(self):
+        self.logger = logging.getLogger()
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            handlers=[logging.StreamHandler(sys.stdout)],
+        )
+        print(STARTUP_BANNER)
         self.host = HOST
         self.port = PORT
         self.clients = dict()

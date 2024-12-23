@@ -3,7 +3,7 @@ import os.path
 import sys
 
 from client.consts import STARTUP_BANNER, CLIENT_ID_PUB_KEY_PATH, CLIENT_ID_PRIV_KEY_PATH
-from common.crypto import CryproHelper
+from common.crypto import CryptoHelper
 from client.server_api import ServerAPI
 
 
@@ -31,7 +31,6 @@ class Client:
             self.priv_id_key, self.pub_id_key = self.load_keys()
         else:
             self.logger.info("Client is not registered yet, starting registration...")
-
             self.priv_id_key, self.pub_id_key = self.register()
 
     def is_registered(self):
@@ -39,8 +38,8 @@ class Client:
 
     def load_keys(self):
         try:
-            return (CryproHelper.load_private_key(self.priv_id_key_path),
-                    CryproHelper.load_public_key(self.pub_id_key_path))
+            return (CryptoHelper.load_private_key(self.priv_id_key_path),
+                    CryptoHelper.load_public_key(self.pub_id_key_path))
         except:
             self.logger.critical("Client seems to be registered but the ID key is invalid, exiting...")
             exit(1)
@@ -52,15 +51,15 @@ class Client:
             os.mkdir(key_dir)
 
         self.logger.info("Creating Identity key pair")
-        priv_id_key, pub_id_key = CryproHelper.generate_key_pair()
+        priv_id_key, pub_id_key = CryptoHelper.generate_key_pair()
 
         otp = self.server_api.server_request_otp()
         if not self.server_api.server_submit_otp(otp):
             self.logger.critical("Client cannot receive valid OTP from server, exiting...")
             exit(1)
 
-        CryproHelper.priv_key_to_file(private_key=priv_id_key, file_path=self.priv_id_key_path)
-        CryproHelper.pub_key_to_file(public_key=pub_id_key, file_path=self.pub_id_key_path)
+        CryptoHelper.priv_key_to_file(private_key=priv_id_key, file_path=self.priv_id_key_path)
+        CryptoHelper.pub_key_to_file(public_key=pub_id_key, file_path=self.pub_id_key_path)
 
         return priv_id_key, pub_id_key
 
