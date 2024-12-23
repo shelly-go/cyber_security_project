@@ -11,4 +11,3 @@ class ClientData:
     one_time_keys: List[bytes] = None
 
     otp_hash: str = None
-    ca: bytes = None

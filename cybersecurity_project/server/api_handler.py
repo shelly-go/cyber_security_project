@@ -12,13 +12,15 @@ from server.utils import generate_otp, send_by_secure_channel
 PHONE_NUMBER_FIELD = 'phone_number'
 OTP_FIELD = 'otp'
 OTP_HASH_FIELD = 'otp_hash'
-CA_FIELD = 'ca'
+ID_KEY_FIELD = 'id_key'
+SIGNED_KEY_FIELD = 'signed_key'
+ONETIME_KEYS_FIELD = 'onetime_keys'
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
 
-    def __init__(self, *args, **kwargs):
-        self.clients = dict()
+    def __init__(self, clients, *args, **kwargs):
+        self.clients = clients
         super().__init__(*args, **kwargs)
 
     def extract_uri(self):
@@ -30,7 +32,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             "/": self.api_root,
             "/register/number": self.api_register_number,
             "/register/otp": self.api_register_otp,
-            "/register/ca": self.api_register_ca,
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -88,22 +89,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def api_register_otp(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
         otp_hash = input_data.get(OTP_HASH_FIELD)
-        if number is None or otp_hash is None:
-            raise Exception("Phone number and otp hash are required.")
+        id_key = input_data.get(ID_KEY_FIELD)
+        signed_key = input_data.get(SIGNED_KEY_FIELD)
+        onetime_keys = input_data.get(ONETIME_KEYS_FIELD)
+        if number is None or otp_hash is None or id_key is None or signed_key is None or onetime_keys is None:
+            raise Exception("Phone number, otp hash, id key, signed key and one-time keys are required.")
 
         client = self.clients.get(number)
         if client is None:
             raise Exception("Phone number does not exist.")
 
         if otp_hash != client.otp_hash:
-            raise Exception("Incorrect otp.")
+            raise Exception(f"Incorrect otp for number {number}.")
+
+        client.identity_key = id_key
+        client.signed_key = signed_key
+        client.one_time_keys = onetime_keys
 
         self.send_response(HTTPStatus.OK)
         return {"status": "ok"}
-
-    def api_register_ca(self, input_data: Dict) -> Dict:
-        self.send_response(HTTPStatus.OK)
-        return input_data
 
     def api_root(self, input_data: Dict = None) -> Dict:
         self.send_response(HTTPStatus.OK)
