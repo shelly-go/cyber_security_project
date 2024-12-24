@@ -7,7 +7,8 @@ from typing import Dict, Callable
 from urllib.parse import urlparse
 
 from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, PUB_ID_KEY_FIELD, SIGNED_KEY_FIELD, \
-    ONETIME_KEYS_FIELD
+    ONETIME_KEYS_FIELD, API_ENDPOINT_REGISTER_VALIDATE, API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_ROOT, STATUS_OK, \
+    STATUS_OK_RESPONSE, ERROR_FIELD, UNSPECIFIED_ERROR
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.utils import generate_otp, send_by_secure_channel
@@ -27,9 +28,9 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         # URI mapping for different API endpoints
         self.logger.debug(f'Getting handler function for uri: "{uri}"')
         mapping = {
-            "/": self.api_root,
-            "/register/number": self.api_register_number,
-            "/register/otp": self.api_register_otp,
+            API_ENDPOINT_ROOT: self.api_root,
+            API_ENDPOINT_REGISTER_NUMBER: self.api_register_number,
+            API_ENDPOINT_REGISTER_VALIDATE: self.api_register_otp,
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -54,7 +55,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             err = e
         finally:
             if err or data_json is None:
-                error_response = {"error": repr(err) if err else "Unspecified"}
+                error_response = {ERROR_FIELD: repr(err) if err else UNSPECIFIED_ERROR}
                 data_json = self.api_error(error_response)
 
         data = json.dumps(data_json).encode()
@@ -108,7 +109,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.api_clients.update_client(number, client_data)
 
         self.send_response(HTTPStatus.OK)
-        return {"status": "ok"}
+        return STATUS_OK_RESPONSE
 
     def api_setup_client_keys(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
@@ -131,8 +132,8 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.api_clients.update_client(number, client_data)
 
         self.send_response(HTTPStatus.OK)
-        return {"status": "ok"}
+        return STATUS_OK_RESPONSE
 
     def api_root(self, input_data: Dict) -> Dict:
         self.send_response(HTTPStatus.OK)
-        return {"status": "ok"}
+        return STATUS_OK_RESPONSE
