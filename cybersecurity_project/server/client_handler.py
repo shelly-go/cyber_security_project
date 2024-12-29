@@ -3,14 +3,16 @@ import threading
 from dataclasses import dataclass
 from typing import List
 
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.x509 import Certificate
+
 
 @dataclass
 class ClientData:
     phone_number: str
     messages: List[bytes] = None
-    identity_key: bytes = None
-    signed_key: bytes = None
-    one_time_keys: List[bytes] = None
+    signed_id_key: Certificate = None
+    one_time_keys: List[RSAPublicKey] = None
 
     otp_hash: str = None
     registration_complete: bool = False

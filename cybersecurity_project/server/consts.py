@@ -3,9 +3,9 @@ PORT = 443
 
 SSL_CERT_PATH = "server/cert/certificate.crt"
 SSL_PRIV_KEY_PATH = "server/cert/privatekey.key"
+ISSUER_NAME = "ProtocolServer"
 
 
-MAX_CONNECTIONS = 10
 CONNECTION_TIMEOUT = 60
 
 

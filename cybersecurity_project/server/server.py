@@ -18,7 +18,6 @@ class Server:
         print(STARTUP_BANNER)
         self.host = HOST
         self.port = PORT
-        self.api_clients = dict()
 
     @staticmethod
     def get_ssl_context(cert_file, key_file):
