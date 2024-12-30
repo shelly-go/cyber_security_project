@@ -86,13 +86,29 @@ class Client:
         self.server_api.server_submit_otks(pub_one_time_keys)
 
     def send_message(self, target, message):
-        pass
-
-    def get_target_id_key(self, target):
-        self.logger.info(f"Fetching target Id-Key for {target} from server")
         target_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
                                                                         target.encode()).hex()
+        target_id_key = self.get_target_id_key(target, target_signature)
+
+        target_otk = self.get_target_otk(target, target_signature, target_id_key)
+        pass
+
+    def get_target_id_key(self, target, target_signature):
+        self.logger.info(f"Fetching target Id-Key for {target} from server")
+
         target_id_key = self.server_api.server_request_target_id_key(target, target_signature)
         CryptoHelper.verify_cert_signature(target_id_key, self.server_api.server_certificate.public_key())
         self.logger.info(f"Target Id-Key signature for {target} was verified")
+        return target_id_key
 
+    def get_target_otk(self, target, target_signature, target_id_key):
+        self.logger.info(f"Fetching target OTK for {target} from server")
+        target_otk_str, target_otk_signature = self.server_api.server_request_target_otk(target, target_signature)
+        signature_match = CryptoHelper.verify_signature_on_data_hash(target_id_key.public_key(),
+                                                                     bytes.fromhex(target_otk_signature),
+                                                                     target_otk_str.encode())
+        if not signature_match:
+            raise Exception("Signature on OTK doesn't match client!")
+        self.logger.info(f"Target OTK signature for {target} was verified")
+        target_otk = CryptoHelper.load_public_key_from_str(target_otk_str)
+        return target_otk

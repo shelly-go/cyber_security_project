@@ -7,7 +7,8 @@ from cryptography.x509 import Certificate
 from client.request_handler import RequestHandler
 from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, OTP_FIELD, \
     API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_REGISTER_VALIDATE, STATUS_FIELD, STATUS_OK, ONETIME_KEYS_FIELD, \
-    API_ENDPOINT_USER_KEYS, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_USER_ID
+    API_ENDPOINT_USER_KEYS, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_USER_ID, \
+    API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD
 from common.crypto import CryptoHelper
 
 
@@ -47,7 +48,7 @@ class ServerAPI:
         return response_data[STATUS_FIELD] == STATUS_OK
 
     def server_submit_otks(self, pub_otk_dict):
-        self.logger.info("Submitting generated OTPs")
+        self.logger.info("Submitting generated OTKs")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         ONETIME_KEYS_FIELD: pub_otk_dict}
         response_data, response_code = self.request_handler.request(API_ENDPOINT_USER_KEYS,
@@ -59,7 +60,7 @@ class ServerAPI:
         return response_data[STATUS_FIELD] == STATUS_OK
 
     def server_request_target_id_key(self, target, target_signature):
-        self.logger.info("Submitting generated OTPs")
+        self.logger.info("Requesting target Id-Key")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         TARGET_NUMBER_FIELD: target,
                         TARGET_NUMBER_SIGNATURE_FIELD: target_signature}
@@ -67,8 +68,21 @@ class ServerAPI:
                                                                     data=request_data)
         if not response_code == HTTPStatus.OK:
             self.logger.critical(
-                f"Error submitting OTKs. error status: {response_code}. error data: {str(response_data)}")
+                f"Error requesting Id-Key. error status: {response_code}. error data: {str(response_data)}")
             exit(1)
         target_id_key = CryptoHelper.cert_from_str(response_data[ID_KEY_FIELD])
         return target_id_key
 
+    def server_request_target_otk(self, target, target_signature):
+        self.logger.info("Requesting target OTK")
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
+                        TARGET_NUMBER_FIELD: target,
+                        TARGET_NUMBER_SIGNATURE_FIELD: target_signature}
+        response_data, response_code = self.request_handler.request(API_ENDPOINT_MSG_REQUEST,
+                                                                    data=request_data)
+        if not response_code == HTTPStatus.OK:
+            self.logger.critical(
+                f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
+            exit(1)
+        target_otk, target_otk_signature = response_data[ONETIME_KEY_FIELD]
+        return target_otk, target_otk_signature

@@ -17,6 +17,7 @@ class ClientData:
     messages: List[bytes] = None
     signed_id_key: Certificate = None
     one_time_keys: Dict[str, RSAPublicKey] = None
+    one_time_key_signatures: Dict[str, str] = None
 
     otp_hash: str = None
     registration_complete: bool = False

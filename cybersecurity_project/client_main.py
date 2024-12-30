@@ -5,7 +5,7 @@ def main():
     client = Client()
     client.set_up_communication()
     client.generate_one_time_keys()
-    client.get_target_id_key("12345")
+    client.send_message("12345", "Secret Tunnel!")
 
 
 if __name__ == '__main__':

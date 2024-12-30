@@ -10,7 +10,8 @@ from cryptography.x509 import Certificate
 
 from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_KEY_FIELD, ONETIME_KEYS_FIELD, \
     API_ENDPOINT_REGISTER_VALIDATE, API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_ROOT, STATUS_OK_RESPONSE, ERROR_FIELD, \
-    UNSPECIFIED_ERROR, API_ENDPOINT_USER_KEYS, API_ENDPOINT_USER_ID, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD
+    UNSPECIFIED_ERROR, API_ENDPOINT_USER_KEYS, API_ENDPOINT_USER_ID, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, \
+    API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -42,6 +43,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             API_ENDPOINT_REGISTER_VALIDATE: self.api_register_otp,
             API_ENDPOINT_USER_KEYS: self.api_setup_client_keys,
             API_ENDPOINT_USER_ID: self.api_client_id,
+            API_ENDPOINT_MSG_REQUEST: self.api_message_request,
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -152,18 +154,20 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             raise Exception("Phone number does not exist.")
 
         one_time_keys_dict = dict()
+        one_time_key_signatures_dict = dict()
         for uuid, key_data in onetime_keys.items():
             otk_public_key_str, otk_signature_str = key_data
-            otk_public_key = CryptoHelper.load_public_key_from_str(otk_public_key_str)
             signature_match = CryptoHelper.verify_signature_on_data_hash(client_data.signed_id_key.public_key(),
                                                                          bytes.fromhex(otk_signature_str),
                                                                          otk_public_key_str.encode())
             if not signature_match:
                 raise Exception("Signature on OTK doesn't match client!")
 
-            one_time_keys_dict.update({uuid:otk_public_key})
+            one_time_keys_dict.update({uuid: CryptoHelper.load_public_key_from_str(otk_public_key_str)})
+            one_time_key_signatures_dict.update({uuid:otk_signature_str})
 
         client_data.one_time_keys = one_time_keys_dict
+        client_data.one_time_key_signatures = one_time_key_signatures_dict
         client_data.registration_complete = True
         self.api_clients.update_client(number, client_data)
 
@@ -196,3 +200,31 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         return {TARGET_NUMBER_FIELD: number, ID_KEY_FIELD: CryptoHelper.cert_to_str(target_data.signed_id_key)}
 
 
+    def api_message_request(self, input_data: Dict) -> Dict:
+        number = input_data.get(PHONE_NUMBER_FIELD)
+        target = input_data.get(TARGET_NUMBER_FIELD)
+        target_signature = input_data.get(TARGET_NUMBER_SIGNATURE_FIELD)
+
+        if not (number and target and target_signature):
+            raise Exception("Phone number, target and signature are required.")
+
+        client_data = self.api_clients.get_client(number)
+        if not client_data:
+            raise Exception("Phone number does not exist.")
+
+        signature_match = CryptoHelper.verify_signature_on_data_hash(client_data.signed_id_key.public_key(),
+                                                                     bytes.fromhex(target_signature),
+                                                                     target.encode())
+        if not signature_match:
+            raise Exception("Signature on target doesn't match client!")
+
+        target_data = self.api_clients.get_client(target)
+        if not target_data:
+            raise Exception("Target number does not exist.")
+
+        otk_uuid, otk = target_data.one_time_keys.popitem()
+        otk_signature = target_data.one_time_key_signatures.pop(otk_uuid)
+        self.api_clients.update_client(target, target_data)
+
+        self.send_response(HTTPStatus.OK)
+        return {TARGET_NUMBER_FIELD: number, ONETIME_KEY_FIELD: [CryptoHelper.pub_key_to_str(otk), otk_signature] }
