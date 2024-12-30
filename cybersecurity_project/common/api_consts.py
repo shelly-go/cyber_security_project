@@ -3,6 +3,8 @@ OTP_FIELD = 'otp'
 OTP_HASH_FIELD = 'otp_hash'
 ID_KEY_FIELD = 'id_key'
 ONETIME_KEYS_FIELD = 'one_time_keys'
+TARGET_NUMBER_FIELD = 'target_number'
+TARGET_NUMBER_SIGNATURE_FIELD = 'target_number_signature'
 
 STATUS_FIELD = 'status'
 ERROR_FIELD = 'error'
@@ -15,6 +17,7 @@ API_ENDPOINT_ROOT = "/"
 API_ENDPOINT_REGISTER_NUMBER = "/register/number"
 API_ENDPOINT_REGISTER_VALIDATE = "/register/validate"
 API_ENDPOINT_USER_KEYS = "/usr/keys"
+API_ENDPOINT_USER_ID = "/usr/ID"
 
 MAX_USERS = 10
 MAX_MSGS = 2

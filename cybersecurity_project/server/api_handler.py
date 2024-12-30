@@ -10,7 +10,7 @@ from cryptography.x509 import Certificate
 
 from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_KEY_FIELD, ONETIME_KEYS_FIELD, \
     API_ENDPOINT_REGISTER_VALIDATE, API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_ROOT, STATUS_OK_RESPONSE, ERROR_FIELD, \
-    UNSPECIFIED_ERROR, API_ENDPOINT_USER_KEYS
+    UNSPECIFIED_ERROR, API_ENDPOINT_USER_KEYS, API_ENDPOINT_USER_ID, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -40,7 +40,8 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             API_ENDPOINT_ROOT: self.api_root,
             API_ENDPOINT_REGISTER_NUMBER: self.api_register_number,
             API_ENDPOINT_REGISTER_VALIDATE: self.api_register_otp,
-            API_ENDPOINT_USER_KEYS: self.api_setup_client_keys
+            API_ENDPOINT_USER_KEYS: self.api_setup_client_keys,
+            API_ENDPOINT_USER_ID: self.api_client_id,
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -83,6 +84,10 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
     def api_error(self, input_data: Dict = None) -> Dict:
         self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
         return input_data
+
+    def api_root(self, input_data: Dict) -> Dict:
+        self.send_response(HTTPStatus.OK)
+        return STATUS_OK_RESPONSE
 
     def api_register_number(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
@@ -154,7 +159,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                                                                          bytes.fromhex(otk_signature_str),
                                                                          otk_public_key_str.encode())
             if not signature_match:
-                raise Exception("Signature doesn't match OTK!")
+                raise Exception("Signature on OTK doesn't match client!")
 
             one_time_keys_dict.update({uuid:otk_public_key})
 
@@ -165,6 +170,29 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         return STATUS_OK_RESPONSE
 
-    def api_root(self, input_data: Dict) -> Dict:
+    def api_client_id(self, input_data: Dict) -> Dict:
+        number = input_data.get(PHONE_NUMBER_FIELD)
+        target = input_data.get(TARGET_NUMBER_FIELD)
+        target_signature = input_data.get(TARGET_NUMBER_SIGNATURE_FIELD)
+
+        if not (number and target and target_signature):
+            raise Exception("Phone number, target and signature are required.")
+
+        client_data = self.api_clients.get_client(number)
+        if not client_data:
+            raise Exception("Phone number does not exist.")
+
+        signature_match = CryptoHelper.verify_signature_on_data_hash(client_data.signed_id_key.public_key(),
+                                                                     bytes.fromhex(target_signature),
+                                                                     target.encode())
+        if not signature_match:
+            raise Exception("Signature on target doesn't match client!")
+
+        target_data = self.api_clients.get_client(target)
+        if not target_data:
+            raise Exception("Target number does not exist.")
+
         self.send_response(HTTPStatus.OK)
-        return STATUS_OK_RESPONSE
+        return {TARGET_NUMBER_FIELD: number, ID_KEY_FIELD: CryptoHelper.cert_to_str(target_data.signed_id_key)}
+
+

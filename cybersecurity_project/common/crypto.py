@@ -86,6 +86,26 @@ class CryptoHelper:
         return signed_cert
 
     @staticmethod
+    def verify_cert_signature(signed_cert: Certificate, public_key: RSAPublicKey) -> bool:
+        try:
+            # Verify the certificate signature
+            public_key.verify(
+                signed_cert.signature,
+                signed_cert.tbs_certificate_bytes,
+                padding.PKCS1v15(),
+                signed_cert.signature_hash_algorithm
+            )
+            return True
+
+        except Exception as e:
+            return False
+
+        # Example usage
+        # signed_cert: the certificate object you want to verify
+        # public_key: the public key object (usually RSA public key) associated with the private key that signed the certificate
+        verified = verify_certificate_signature(signed_cert, public_key)
+
+    @staticmethod
     def cert_to_str(certificate: Certificate):
         return certificate.public_bytes(encoding=serialization.Encoding.PEM).decode()
 

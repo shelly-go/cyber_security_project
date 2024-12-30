@@ -29,3 +29,4 @@ SERVER_URL = "https://localhost/client"
 CLIENT_ID_KEY_DIR = "client/client_info/{phone_num}"
 CLIENT_ID_PUB_KEY_PATH = os.path.join(CLIENT_ID_KEY_DIR, "client_{phone_num}_id.pem")
 CLIENT_ID_PRIV_KEY_PATH = os.path.join(CLIENT_ID_KEY_DIR, "client_{phone_num}_id.key")
+SERVER_CERT_PATH = "client/server_cert/certificate.crt"

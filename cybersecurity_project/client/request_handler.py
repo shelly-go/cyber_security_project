@@ -6,15 +6,15 @@ from urllib import request
 from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin
 
-from client.consts import SERVER_URL
-
-SERVER_CERT_PATH = "client/server_cert/certificate.crt"
+from client.consts import SERVER_URL, SERVER_CERT_PATH
+from common.crypto import CryptoHelper
 
 
 class RequestHandler:
     def __init__(self, server_url=SERVER_URL):
         self.server_url = server_url
         self.ssl_context = self.get_ssl_context(SERVER_CERT_PATH)
+        self.server_certificate = CryptoHelper.cert_from_file(SERVER_CERT_PATH)
         self.logger = logging.getLogger()
 
     @staticmethod

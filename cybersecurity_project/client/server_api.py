@@ -7,13 +7,14 @@ from cryptography.x509 import Certificate
 from client.request_handler import RequestHandler
 from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, OTP_FIELD, \
     API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_REGISTER_VALIDATE, STATUS_FIELD, STATUS_OK, ONETIME_KEYS_FIELD, \
-    API_ENDPOINT_USER_KEYS
+    API_ENDPOINT_USER_KEYS, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_USER_ID
 from common.crypto import CryptoHelper
 
 
 class ServerAPI:
     def __init__(self, client):
         self.request_handler = RequestHandler()
+        self.server_certificate = self.request_handler.server_certificate
         self.client = client
         self.logger = logging.getLogger()
 
@@ -56,3 +57,18 @@ class ServerAPI:
                 f"Error submitting OTKs. error status: {response_code}. error data: {str(response_data)}")
             exit(1)
         return response_data[STATUS_FIELD] == STATUS_OK
+
+    def server_request_target_id_key(self, target, target_signature):
+        self.logger.info("Submitting generated OTPs")
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
+                        TARGET_NUMBER_FIELD: target,
+                        TARGET_NUMBER_SIGNATURE_FIELD: target_signature}
+        response_data, response_code = self.request_handler.request(API_ENDPOINT_USER_ID,
+                                                                    data=request_data)
+        if not response_code == HTTPStatus.OK:
+            self.logger.critical(
+                f"Error submitting OTKs. error status: {response_code}. error data: {str(response_data)}")
+            exit(1)
+        target_id_key = CryptoHelper.cert_from_str(response_data[ID_KEY_FIELD])
+        return target_id_key
+

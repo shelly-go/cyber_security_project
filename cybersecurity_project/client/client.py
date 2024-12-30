@@ -71,6 +71,7 @@ class Client:
         return priv_id_key, pub_id_key
 
     def generate_one_time_keys(self):
+        self.logger.info("Creating One-time keys")
         pub_one_time_keys = dict()
         dh_parameters = CryptoHelper.dh_params_from_public_key(self.pub_id_key)
         for _ in range(MAX_USERS * MAX_MSGS):
@@ -84,5 +85,14 @@ class Client:
 
         self.server_api.server_submit_otks(pub_one_time_keys)
 
-    def start_communication(self):
+    def send_message(self, target, message):
         pass
+
+    def get_target_id_key(self, target):
+        self.logger.info(f"Fetching target Id-Key for {target} from server")
+        target_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
+                                                                        target.encode()).hex()
+        target_id_key = self.server_api.server_request_target_id_key(target, target_signature)
+        CryptoHelper.verify_cert_signature(target_id_key, self.server_api.server_certificate.public_key())
+        self.logger.info(f"Target Id-Key signature for {target} was verified")
+
