@@ -54,7 +54,7 @@ class Client:
         key_dir = os.path.dirname(self.pub_id_key_path)
         if not os.path.exists(key_dir):
             self.logger.info("Registration directory does not exist, creating...")
-            os.mkdir(key_dir)
+            os.makedirs(key_dir)
 
         self.logger.info("Creating Identity key pair")
         priv_id_key, pub_id_key = CryptoHelper.generate_key_pair()

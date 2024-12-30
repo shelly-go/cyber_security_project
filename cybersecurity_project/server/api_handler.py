@@ -130,6 +130,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         client_data.signed_id_key = self.__sign_certificate(id_key_cert)
         client_data.otp_hash = None
         self.api_clients.update_client(number, client_data)
+        self.api_clients.save_client_id_key_to_file(number)
 
         self.send_response(HTTPStatus.OK)
         return STATUS_OK_RESPONSE

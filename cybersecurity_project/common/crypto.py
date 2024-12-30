@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.asymmetric.dh import DHParameters, DHParameterNumbers
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
-from cryptography.x509 import Certificate
+from cryptography.x509 import Certificate, load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
 
 from common.crypto_consts import HASH_ALGO, DH_GENERATOR
@@ -92,6 +92,20 @@ class CryptoHelper:
     @staticmethod
     def cert_from_str(certificate: str):
         return x509.load_pem_x509_certificate(certificate.encode(), default_backend())
+
+    @staticmethod
+    def cert_to_file(certificate: Certificate, file_path: str):
+        logger.debug("Saving certificate to file")
+        with open(file_path, 'w') as f:
+            f.write(CryptoHelper.cert_to_str(certificate))
+
+    @staticmethod
+    def cert_from_file(file_path: str):
+        logger.debug("Loading certificate from file")
+        with open(file_path, 'rb') as f:
+            cert_data = f.read()
+        certificate = load_pem_x509_certificate(cert_data, backend=default_backend())
+        return certificate
 
     @staticmethod
     def user_id_from_cert(certificate: Certificate):

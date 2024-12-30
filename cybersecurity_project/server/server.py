@@ -4,6 +4,7 @@ import ssl
 import sys
 
 from server.api_handler import APIHandler
+from server.client_handler import ClientHandler
 from server.consts import HOST, PORT, SSL_CERT_PATH, SSL_PRIV_KEY_PATH, STARTUP_BANNER
 
 
@@ -16,8 +17,11 @@ class Server:
             handlers=[logging.StreamHandler(sys.stdout)],
         )
         print(STARTUP_BANNER)
+
         self.host = HOST
         self.port = PORT
+
+        ClientHandler().load_client_id_keys()
 
     @staticmethod
     def get_ssl_context(cert_file, key_file):

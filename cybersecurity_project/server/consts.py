@@ -1,3 +1,5 @@
+import os
+
 HOST = "127.0.0.1"
 PORT = 443
 
@@ -5,9 +7,7 @@ SSL_CERT_PATH = "server/cert/certificate.crt"
 SSL_PRIV_KEY_PATH = "server/cert/privatekey.key"
 ISSUER_NAME = "ProtocolServer"
 
-
 CONNECTION_TIMEOUT = 60
-
 
 STARTUP_BANNER = """                                                                                                                                   
 8 888888888o   8 888888888o.      ,o888888o. 8888888 8888888888 ,o888888o.         ,o888888o.        ,o888888o.     8 8888         
@@ -32,3 +32,7 @@ STARTUP_BANNER = """
           `8b.  ;8.`8888 8 8888         8 8888   `8b.         `8.`8'         8 8888         8 8888   `8b.                          
            `Y8888P ,88P' 8 888888888888 8 8888     `88.        `8.`          8 888888888888 8 8888     `88.                        
                             By: Tal Druzhinin & Shelly Goltzman"""
+
+SERVER_ID_KEY_DIR = os.path.join("server","client_info")
+SERVER_ID_KEY_CLIENT_DIR = os.path.join(SERVER_ID_KEY_DIR, "{phone_num}")
+SERVER_SIGNED_ID_KEY_PATH = os.path.join(SERVER_ID_KEY_CLIENT_DIR, "client_{phone_num}_id.pem")
