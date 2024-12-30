@@ -10,7 +10,7 @@ from cryptography.x509 import Certificate
 
 from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_KEY_FIELD, ONETIME_KEYS_FIELD, \
     API_ENDPOINT_REGISTER_VALIDATE, API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_ROOT, STATUS_OK_RESPONSE, ERROR_FIELD, \
-    UNSPECIFIED_ERROR
+    UNSPECIFIED_ERROR, API_ENDPOINT_USER_KEYS
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -40,6 +40,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             API_ENDPOINT_ROOT: self.api_root,
             API_ENDPOINT_REGISTER_NUMBER: self.api_register_number,
             API_ENDPOINT_REGISTER_VALIDATE: self.api_register_otp,
+            API_ENDPOINT_USER_KEYS: self.api_setup_client_keys
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -127,6 +128,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             raise Exception(f"Incorrect certificate for number {number}.")
 
         client_data.signed_id_key = self.__sign_certificate(id_key_cert)
+        client_data.otp_hash = None
         self.api_clients.update_client(number, client_data)
 
         self.send_response(HTTPStatus.OK)
@@ -134,20 +136,28 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
 
     def api_setup_client_keys(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
-        otp_hash = input_data.get(OTP_HASH_FIELD)
         onetime_keys = input_data.get(ONETIME_KEYS_FIELD)
 
-        if not (number and otp_hash and onetime_keys):
-            raise Exception("Phone number, id key and one-time keys are required.")
+        if not (number and onetime_keys):
+            raise Exception("Phone number and one-time keys are required.")
 
         client_data = self.api_clients.get_client(number)
         if not client_data:
             raise Exception("Phone number does not exist.")
 
-        if otp_hash != client_data.otp_hash:
-            raise Exception(f"Incorrect otp for number {number}.")
+        one_time_keys_dict = dict()
+        for uuid, key_data in onetime_keys.items():
+            otk_public_key_str, otk_signature_str = key_data
+            otk_public_key = CryptoHelper.load_public_key_from_str(otk_public_key_str)
+            signature_match = CryptoHelper.verify_signature_on_data_hash(client_data.signed_id_key.public_key(),
+                                                                         bytes.fromhex(otk_signature_str),
+                                                                         otk_public_key_str.encode())
+            if not signature_match:
+                raise Exception("Signature doesn't match OTK!")
 
-        client_data.one_time_keys = onetime_keys
+            one_time_keys_dict.update({uuid:otk_public_key})
+
+        client_data.one_time_keys = one_time_keys_dict
         client_data.registration_complete = True
         self.api_clients.update_client(number, client_data)
 

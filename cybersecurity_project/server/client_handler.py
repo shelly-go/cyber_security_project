@@ -1,7 +1,7 @@
 import logging
 import threading
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.x509 import Certificate
@@ -12,7 +12,7 @@ class ClientData:
     phone_number: str
     messages: List[bytes] = None
     signed_id_key: Certificate = None
-    one_time_keys: List[RSAPublicKey] = None
+    one_time_keys: Dict[str, RSAPublicKey] = None
 
     otp_hash: str = None
     registration_complete: bool = False

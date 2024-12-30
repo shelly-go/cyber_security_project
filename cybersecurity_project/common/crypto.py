@@ -52,7 +52,7 @@ class CryptoHelper:
         ).not_valid_after(
             # Certificate valid for 1 year
             datetime.datetime.now() + datetime.timedelta(days=365)
-        ).sign(private_key, CryptoHelper.HASH_ALGO, default_backend())
+        ).sign(private_key, HASH_ALGO, default_backend())
         return certificate
 
     @staticmethod
@@ -81,7 +81,7 @@ class CryptoHelper:
         ).not_valid_after(
             # Define validity period for 1 year
             datetime.datetime.now() + datetime.timedelta(days=365)
-        ).sign(signer_private_key, CryptoHelper.HASH_ALGO, default_backend())
+        ).sign(signer_private_key, HASH_ALGO, default_backend())
 
         return signed_cert
 
@@ -136,6 +136,18 @@ class CryptoHelper:
         with open(pub_key_file_path, 'rb') as f:
             pub_key_data = f.read()
         public_key = load_pem_public_key(pub_key_data)
+        return public_key
+
+    @staticmethod
+    def load_private_key_from_str(priv_key_str) -> RSAPrivateKey:
+        logger.debug("Loading RSA private key from buffer")
+        private_key = load_pem_private_key(priv_key_str.encode(), password=None, backend=default_backend())
+        return private_key
+
+    @staticmethod
+    def load_public_key_from_str(pub_key_str) -> RSAPublicKey:
+        logger.debug("Loading RSA public key from buffer")
+        public_key = load_pem_public_key(pub_key_str.encode())
         return public_key
 
     @staticmethod
