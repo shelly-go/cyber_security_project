@@ -6,8 +6,11 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import padding as symmetric_padding
 from cryptography.hazmat.primitives.asymmetric.dh import DHParameters, DHParameterNumbers
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
+from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 from cryptography.x509 import Certificate, load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
@@ -219,3 +222,34 @@ class CryptoHelper:
     @staticmethod
     def dh_params_from_public_key(public_key: RSAPublicKey) -> DHParameters:
         return DHParameterNumbers(g=DH_GENERATOR, p=public_key.public_numbers().n).parameters()
+
+    @staticmethod
+    def dh_get_key_from_shared_secret(shared_secret: bytes) -> bytes:
+        return HKDF(algorithm=HASH_ALGO,
+                    length=32,
+                    salt=None,
+                    info=None,
+                    backend=default_backend()).derive(shared_secret)
+
+    @staticmethod
+    def aes_encrypt_message(key: bytes, plaintext: bytes):
+        pad = symmetric_padding.PKCS7(algorithms.AES.block_size).padder()
+        padded_plaintext = pad.update(plaintext) + pad.finalize()
+
+        cipher = Cipher(algorithms.AES(key), modes.CBC(key[:16]), backend=default_backend())
+        encryptor = cipher.encryptor()
+
+        ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
+        return ciphertext
+
+    @staticmethod
+    def aes_decrypt_message(key: bytes, ciphertext: bytes):
+        cipher = Cipher(algorithms.AES(key), modes.CBC(key[:16]), backend=default_backend())
+        decryptor = cipher.decryptor()
+
+        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+
+        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+        plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+
+        return plaintext

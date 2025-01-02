@@ -14,7 +14,8 @@ from server.consts import SERVER_ID_KEY_DIR, SERVER_SIGNED_ID_KEY_PATH, SERVER_I
 @dataclass
 class ClientData:
     phone_number: str
-    messages: List[bytes] = None
+    messages: Dict[str, tuple] = None
+    confirmations: Dict[str, tuple] = None
     signed_id_key: Certificate = None
     one_time_keys: Dict[str, RSAPublicKey] = None
     one_time_key_signatures: Dict[str, str] = None

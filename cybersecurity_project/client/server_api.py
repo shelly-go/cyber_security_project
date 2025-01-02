@@ -1,14 +1,16 @@
 import logging
 from http import HTTPStatus
 
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.x509 import Certificate
 
 from client.request_handler import RequestHandler
 from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, OTP_FIELD, \
     API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_REGISTER_VALIDATE, STATUS_FIELD, STATUS_OK, ONETIME_KEYS_FIELD, \
     API_ENDPOINT_USER_KEYS, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_USER_ID, \
-    API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD
+    API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD, ONETIME_KEY_UUID_FIELD, MESSAGE_PUBLIC_KEY_FIELD, \
+    MESSAGE_ENC_MESSAGE_FIELD, \
+    MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, PHONE_NUMBER_SIGNATURE_FIELD, MESSAGE_INCOMING_FIELD, \
+    MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX
 from common.crypto import CryptoHelper
 
 
@@ -84,5 +86,36 @@ class ServerAPI:
             self.logger.critical(
                 f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
             exit(1)
-        target_otk, target_otk_signature = response_data[ONETIME_KEY_FIELD]
-        return target_otk, target_otk_signature
+        target_otk_uuid, target_otk, target_otk_signature = response_data[ONETIME_KEY_FIELD]
+        return target_otk_uuid, target_otk, target_otk_signature
+
+    def server_submit_message_and_ek(self, target, target_otk_uuid, session_pub_key_str, enc_message, bundle_signature):
+        self.logger.info("Sending encrypted message")
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
+                        TARGET_NUMBER_FIELD: target,
+                        ONETIME_KEY_UUID_FIELD: target_otk_uuid,
+                        MESSAGE_PUBLIC_KEY_FIELD: session_pub_key_str,
+                        MESSAGE_ENC_MESSAGE_FIELD: enc_message,
+                        MESSAGE_BUNDLE_SIGNATURE_FIELD: bundle_signature}
+        response_data, response_code = self.request_handler.request(API_ENDPOINT_MSG_SEND,
+                                                                    data=request_data)
+        if not response_code == HTTPStatus.OK:
+            self.logger.critical(
+                f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
+            exit(1)
+        return response_data[STATUS_FIELD] == STATUS_OK
+
+    def server_request_inbox(self, phone_num_signature):
+        self.logger.info("Sending inbox request")
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
+                        PHONE_NUMBER_SIGNATURE_FIELD: phone_num_signature}
+        response_data, response_code = self.request_handler.request(API_ENDPOINT_MSG_INBOX,
+                                                                    data=request_data)
+        if not response_code == HTTPStatus.OK:
+            self.logger.critical(
+                f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
+            exit(1)
+
+        incoming_messages = response_data[MESSAGE_INCOMING_FIELD]
+        incoming_confirmations = response_data[MESSAGE_CONF_INCOMING_FIELD]
+        return incoming_messages, incoming_confirmations
