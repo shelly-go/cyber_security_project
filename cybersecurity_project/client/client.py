@@ -33,14 +33,18 @@ class Client:
 
         self.private_one_time_keys = dict()
         self.messages_sent = dict()
+        self.client_id_keys = dict()
 
     def set_up_communication(self):
         if not self.is_registered():
             self.logger.info("Client is not registered yet, starting registration...")
-            self.priv_id_key, self.pub_id_key = self.register()
+            self.priv_id_key, self.pub_id_key, id_key_cert = self.register()
         else:
             self.logger.info("Client is registered already, loading client identity...")
             self.priv_id_key, self.pub_id_key = self.load_keys()
+            id_key_cert = CryptoHelper.generate_id_cert_from_key(self.priv_id_key, self.pub_id_key, self.phone_num)
+
+        self.client_id_keys.update({self.phone_num: id_key_cert})
 
     def is_registered(self):
         return os.path.exists(self.pub_id_key_path) and os.path.exists(self.priv_id_key_path)
@@ -71,7 +75,7 @@ class Client:
         CryptoHelper.priv_key_to_file(private_key=priv_id_key, file_path=self.priv_id_key_path)
         CryptoHelper.pub_key_to_file(public_key=pub_id_key, file_path=self.pub_id_key_path)
 
-        return priv_id_key, pub_id_key
+        return priv_id_key, pub_id_key, id_key_cert
 
     def generate_one_time_keys(self):
         self.logger.info("Creating One-time keys")
@@ -104,8 +108,12 @@ class Client:
         self.parse_incoming_confirmations(incoming_confirmations)
 
     def get_target_id_key(self, target):
-        # TODO target id-key cache
         self.logger.info(f"Fetching target Id-Key for {target} from server")
+
+        cached_id_key = self.client_id_keys.get(target)
+        if cached_id_key:
+            self.logger.info(f"Id-Key for {target} found in cache")
+            return cached_id_key
 
         target_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
                                                                         target.encode()).hex()
@@ -117,6 +125,8 @@ class Client:
         if not CryptoHelper.user_id_from_cert(target_id_key) == target:
             raise Exception("Certificate subject doesn't match target!")
         self.logger.info(f"Target Id-Key signature for {target} was verified")
+        self.logger.info(f"Saving Id-Key for {target} in cache")
+        self.client_id_keys.update({target: target_id_key})
         return target_id_key
 
     def get_target_otk(self, target, target_id_key):
