@@ -130,9 +130,10 @@ class Client:
     @staticmethod
     def generate_pub_key_and_ek(target_id_key, target_otk):
         client_session_dh_params = CryptoHelper.dh_params_from_public_key(target_id_key.public_key())
-        session_pub_key_str = CryptoHelper.pub_key_to_str(client_session_dh_params.generate_private_key().public_key())
-        shared_secret = client_session_dh_params.generate_private_key().exchange(target_otk)
+        session_priv_key = client_session_dh_params.generate_private_key()
+        shared_secret = session_priv_key.exchange(target_otk)
         shared_ephemeral_key = CryptoHelper.dh_get_key_from_shared_secret(shared_secret)
+        session_pub_key_str = CryptoHelper.pub_key_to_str(session_priv_key.public_key())
         return session_pub_key_str, shared_ephemeral_key
 
     def generate_ek_from_otk(self, otk_uuid, target_pub_key):
@@ -146,7 +147,7 @@ class Client:
 
         enc_message = CryptoHelper.aes_encrypt_message(shared_ephemeral_key, message.encode())
 
-        bundle = target.encode() + enc_message + session_pub_key_str.encode()
+        bundle = self.phone_num.encode() + enc_message + session_pub_key_str.encode()
         bundle_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key, bundle).hex()
 
         self.server_api.server_submit_message_and_ek(target, target_otk_uuid, session_pub_key_str,
@@ -180,7 +181,7 @@ class Client:
                 session_pub_key = CryptoHelper.load_public_key_from_str(session_pub_key_str)
                 shared_ephemeral_key = self.generate_ek_from_otk(otk_uuid, session_pub_key)
                 dec_message = CryptoHelper.aes_decrypt_message(shared_ephemeral_key, bytes.fromhex(enc_message))
-                self.logger.info(f"Message: \"{dec_message}\" received from {sender}, message ID - {otk_uuid}")
+                self.logger.info(f"Message: \"{dec_message.decode()}\" received from {sender}, message ID - {otk_uuid}")
         self.logger.info(f"All messages handled")
 
     def parse_incoming_confirmations(self, confirmations: Dict):

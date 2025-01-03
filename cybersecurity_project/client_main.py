@@ -5,7 +5,9 @@ def main():
     client = Client()
     client.set_up_communication()
     client.generate_one_time_keys()
-    client.send_message("12345", "Secret Tunnel!")
+    target = "12345"
+    message = "Well hello there"
+    client.send_message(target, message)
     client.receive_messages()
     client.receive_messages()
 

@@ -249,7 +249,7 @@ class CryptoHelper:
 
         padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
 
-        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-        plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+        unpad = symmetric_padding.PKCS7(algorithms.AES.block_size).unpadder()
+        plaintext = unpad.update(padded_plaintext) + unpad.finalize()
 
         return plaintext

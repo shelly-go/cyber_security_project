@@ -252,7 +252,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         if not sender_data:
             raise Exception("Phone number does not exist.")
 
-        bundle = target.encode() + bytes.fromhex(enc_message) + session_pub_key_str.encode()
+        bundle = sender_number.encode() + bytes.fromhex(enc_message) + session_pub_key_str.encode()
         signature_match = CryptoHelper.verify_signature_on_data_hash(sender_data.signed_id_key.public_key(),
                                                                      bytes.fromhex(bundle_signature),
                                                                      bundle)
