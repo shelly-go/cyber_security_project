@@ -111,6 +111,8 @@ class Client:
         if not CryptoHelper.verify_cert_signature(target_id_key, self.server_api.server_certificate.public_key()):
             self.logger.critical(f"Target Id-Key signature for {target} was not verified by the server, exiting...")
             exit(1)
+        if not CryptoHelper.user_id_from_cert(target_id_key) == target:
+            raise Exception("Certificate subject doesn't match target!")
         self.logger.info(f"Target Id-Key signature for {target} was verified")
         return target_id_key
 
@@ -172,7 +174,7 @@ class Client:
                                                                              bytes.fromhex(bundle_signature),
                                                                              bundle)
                 if not signature_match:
-                    raise Exception("Signature on target doesn't match client!")
+                    raise Exception("Signature on message doesn't match sender!")
 
                 otk_secret = self.private_one_time_keys.get(otk_uuid)
                 if not otk_secret:

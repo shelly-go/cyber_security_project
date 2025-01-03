@@ -4,9 +4,9 @@ from typing import Tuple
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import padding as symmetric_padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import padding as symmetric_padding
 from cryptography.hazmat.primitives.asymmetric.dh import DHParameters, DHParameterNumbers
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
@@ -24,7 +24,6 @@ class CryptoHelper:
 
     @staticmethod
     def generate_key_pair() -> Tuple[RSAPrivateKey, RSAPublicKey]:
-        # Generate a new RSA key pair
         logger.debug("Generating new RSA private key")
         private_key = rsa.generate_private_key(
             public_exponent=65537,
@@ -65,12 +64,12 @@ class CryptoHelper:
         public_key = cert_to_sign.public_key()
         logger.debug(f"Generating new certificate by {issuer_name} to sign certificate {subject.rfc4514_string()}")
 
-        # Define the issuer (your information)
+
         issuer = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, issuer_name)
         ])
 
-        # Build a new certificate
+
         signed_cert = x509.CertificateBuilder().subject_name(
             subject
         ).issuer_name(
@@ -82,7 +81,7 @@ class CryptoHelper:
         ).not_valid_before(
             datetime.datetime.now()
         ).not_valid_after(
-            # Define validity period for 1 year
+            # Certificate valid for 1 year
             datetime.datetime.now() + datetime.timedelta(days=365)
         ).sign(signer_private_key, HASH_ALGO, default_backend())
 
@@ -91,7 +90,6 @@ class CryptoHelper:
     @staticmethod
     def verify_cert_signature(signed_cert: Certificate, public_key: RSAPublicKey) -> bool:
         try:
-            # Verify the certificate signature
             public_key.verify(
                 signed_cert.signature,
                 signed_cert.tbs_certificate_bytes,
@@ -102,11 +100,6 @@ class CryptoHelper:
 
         except Exception as e:
             return False
-
-        # Example usage
-        # signed_cert: the certificate object you want to verify
-        # public_key: the public key object (usually RSA public key) associated with the private key that signed the certificate
-        verified = verify_certificate_signature(signed_cert, public_key)
 
     @staticmethod
     def cert_to_str(certificate: Certificate):
