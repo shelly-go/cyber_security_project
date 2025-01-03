@@ -14,7 +14,7 @@ from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_
     API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD, ONETIME_KEY_UUID_FIELD, MESSAGE_PUBLIC_KEY_FIELD, \
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, API_ENDPOINT_MSG_INBOX, MESSAGE_INCOMING_FIELD, \
-    MESSAGE_CONF_INCOMING_FIELD, PHONE_NUMBER_SIGNATURE_FIELD
+    MESSAGE_CONF_INCOMING_FIELD, PHONE_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_MSG_CONFIRM, MESSAGE_HASH_FIELD
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -49,6 +49,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             API_ENDPOINT_MSG_REQUEST: self.api_message_request,
             API_ENDPOINT_MSG_SEND: self.api_message_send,
             API_ENDPOINT_MSG_INBOX: self.api_message_inbox,
+            API_ENDPOINT_MSG_CONFIRM: self.api_message_confirm,
         }
 
         handler = mapping.get(uri) or self.api_not_implemented
@@ -289,5 +290,48 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             raise Exception("Signature on target doesn't match client!")
 
         self.send_response(HTTPStatus.OK)
-        return {MESSAGE_INCOMING_FIELD: client_data.messages,
-                MESSAGE_CONF_INCOMING_FIELD: client_data.confirmations}
+        response = {MESSAGE_INCOMING_FIELD: client_data.messages,
+                    MESSAGE_CONF_INCOMING_FIELD: client_data.confirmations}
+
+        client_data.confirmations = dict()
+        self.api_clients.update_client(number, client_data)
+
+        return response
+
+    def api_message_confirm(self, input_data: Dict) -> Dict:
+        number = input_data.get(PHONE_NUMBER_FIELD)
+        sender_number = input_data.get(TARGET_NUMBER_FIELD)
+        sender_otk_uuid = input_data.get(ONETIME_KEY_UUID_FIELD)
+        message_hash = input_data.get(MESSAGE_HASH_FIELD)
+        hash_signature = input_data.get(MESSAGE_BUNDLE_SIGNATURE_FIELD)
+
+        if not (number and sender_number and sender_otk_uuid and message_hash and hash_signature):
+            raise Exception("Phone number, sender, OTK UUID, message_hash and signature are required")
+
+        client_data = self.api_clients.get_client(number)
+        if not client_data:
+            raise Exception("Phone number does not exist.")
+
+        signature_match = CryptoHelper.verify_signature_on_data_hash(client_data.signed_id_key.public_key(),
+                                                                     bytes.fromhex(hash_signature),
+                                                                     message_hash.encode())
+        if not signature_match:
+            raise Exception("Signature on message doesn't match client!")
+
+        sender_data = self.api_clients.get_client(sender_number)
+        if not sender_data:
+            raise Exception("Sender number does not exist.")
+
+        outgoing_sender_confirmations = sender_data.confirmations.get(number) or list()
+        outgoing_sender_confirmations.append((sender_otk_uuid, message_hash, hash_signature))
+        sender_data.confirmations.update({number: outgoing_sender_confirmations})
+
+        incoming_messages = client_data.messages.get(sender_number) or list()
+        incoming_unconfirmed_messages = [msg_data for msg_data in incoming_messages if sender_otk_uuid not in msg_data]
+        client_data.messages.update({sender_number: incoming_unconfirmed_messages})
+
+        self.api_clients.update_client(sender_number, sender_data)
+        self.api_clients.update_client(number, client_data)
+
+        self.send_response(HTTPStatus.OK)
+        return STATUS_OK_RESPONSE

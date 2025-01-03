@@ -14,21 +14,22 @@ from common.crypto import CryptoHelper
 
 class Client:
     def __init__(self):
+        print(STARTUP_BANNER)
+        self.phone_num = input("Please enter your phone number:\t")
+
         self.logger = logging.getLogger()
         logging.basicConfig(
             level=logging.DEBUG,
-            format="%(asctime)s [%(levelname)s] %(message)s",
+            format=f"%(asctime)s [%(levelname)s] <{self.phone_num}> %(message)s",
             handlers=[logging.StreamHandler(sys.stdout)],
         )
-        print(STARTUP_BANNER)
         self.server_api = ServerAPI(self)
-        self.phone_num = input("Please enter your phone number:\t")
         self.logger.info(f"Initializing client for phone number - {self.phone_num}...")
 
         self.pub_id_key_path = CLIENT_ID_PUB_KEY_PATH.format(phone_num=self.phone_num)
         self.priv_id_key_path = CLIENT_ID_PRIV_KEY_PATH.format(phone_num=self.phone_num)
-        self.priv_id_key: RSAPrivateKey = None
-        self.pub_id_key: RSAPublicKey = None
+        self.priv_id_key: RSAPrivateKey | None = None
+        self.pub_id_key: RSAPublicKey | None = None
 
         self.private_one_time_keys = dict()
         self.messages_sent = dict()
@@ -48,7 +49,7 @@ class Client:
         try:
             return (CryptoHelper.load_private_key(self.priv_id_key_path),
                     CryptoHelper.load_public_key(self.pub_id_key_path))
-        except:
+        except Exception:
             self.logger.critical("Client seems to be registered but the ID key is invalid, exiting...")
             exit(1)
 
@@ -88,11 +89,9 @@ class Client:
         self.server_api.server_submit_otks(pub_one_time_keys)
 
     def send_message(self, target, message):
-        target_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
-                                                                        target.encode()).hex()
-        target_id_key = self.get_target_id_key(target, target_signature)
-
-        target_otk_uuid, target_otk = self.get_target_otk(target, target_signature, target_id_key)
+        self.logger.info(f"Sending message: \"{message}\" to {target}")
+        target_id_key = self.get_target_id_key(target)
+        target_otk_uuid, target_otk = self.get_target_otk(target, target_id_key)
         session_pub_key_str, shared_ephemeral_key = self.generate_pub_key_and_ek(target_id_key, target_otk)
         self.submit_encrypted_message(target, session_pub_key_str, shared_ephemeral_key, target_otk_uuid, message)
 
@@ -104,8 +103,12 @@ class Client:
         self.parse_incoming_messages(incoming_messages)
         self.parse_incoming_confirmations(incoming_confirmations)
 
-    def get_target_id_key(self, target, target_signature):
+    def get_target_id_key(self, target):
+        # TODO target id-key cache
         self.logger.info(f"Fetching target Id-Key for {target} from server")
+
+        target_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
+                                                                        target.encode()).hex()
 
         target_id_key = self.server_api.server_request_target_id_key(target, target_signature)
         if not CryptoHelper.verify_cert_signature(target_id_key, self.server_api.server_certificate.public_key()):
@@ -116,10 +119,14 @@ class Client:
         self.logger.info(f"Target Id-Key signature for {target} was verified")
         return target_id_key
 
-    def get_target_otk(self, target, target_signature, target_id_key):
+    def get_target_otk(self, target, target_id_key):
         self.logger.info(f"Fetching target OTK for {target} from server")
+
+        target_sign = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
+                                                                   target.encode()).hex()
+
         target_otk_uuid, target_otk_str, target_otk_signature = self.server_api.server_request_target_otk(target,
-                                                                                                          target_signature)
+                                                                                                          target_sign)
         signature_match = CryptoHelper.verify_signature_on_data_hash(target_id_key.public_key(),
                                                                      bytes.fromhex(target_otk_signature),
                                                                      target_otk_str.encode())
@@ -145,8 +152,6 @@ class Client:
         return shared_ephemeral_key
 
     def submit_encrypted_message(self, target, session_pub_key_str, shared_ephemeral_key, target_otk_uuid, message):
-        self.logger.info(f"Sending message: \"{message}\" to {target}")
-
         enc_message = CryptoHelper.aes_encrypt_message(shared_ephemeral_key, message.encode())
 
         bundle = self.phone_num.encode() + enc_message + session_pub_key_str.encode()
@@ -155,19 +160,17 @@ class Client:
         self.server_api.server_submit_message_and_ek(target, target_otk_uuid, session_pub_key_str,
                                                      enc_message.hex(), bundle_signature)
 
-        self.messages_sent.update({target_otk_uuid: CryptoHelper.hash_data_to_hex(message.encode())})
+        self.messages_sent.update({target_otk_uuid: (target, CryptoHelper.hash_data_to_hex(message.encode()))})
 
         self.logger.info(f"Message: \"{message}\" sent to {target}, message ID - {target_otk_uuid}")
 
     def parse_incoming_messages(self, messages: Dict):
         for sender, sender_messages in messages.items():
-            self.logger.info(f"Received messages from {sender}")
             for message_bundle in sender_messages:
+                self.logger.info(f"Received message from {sender}")
                 otk_uuid, enc_message, session_pub_key_str, bundle_signature = message_bundle
 
-                sender_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key,
-                                                                                sender.encode()).hex()
-                sender_id_key = self.get_target_id_key(sender, sender_signature)
+                sender_id_key = self.get_target_id_key(sender)
 
                 bundle = sender.encode() + bytes.fromhex(enc_message) + session_pub_key_str.encode()
                 signature_match = CryptoHelper.verify_signature_on_data_hash(sender_id_key.public_key(),
@@ -178,13 +181,48 @@ class Client:
 
                 otk_secret = self.private_one_time_keys.get(otk_uuid)
                 if not otk_secret:
-                    self.logger.critical(f"Message was sent with an invalid OTK, skipping...")
+                    self.logger.critical(f"Message was sent with an invalid UUID, skipping...")
                     continue
                 session_pub_key = CryptoHelper.load_public_key_from_str(session_pub_key_str)
                 shared_ephemeral_key = self.generate_ek_from_otk(otk_uuid, session_pub_key)
                 dec_message = CryptoHelper.aes_decrypt_message(shared_ephemeral_key, bytes.fromhex(enc_message))
                 self.logger.info(f"Message: \"{dec_message.decode()}\" received from {sender}, message ID - {otk_uuid}")
+                self.confirm_received_message(sender, otk_uuid, dec_message)
         self.logger.info(f"All messages handled")
 
     def parse_incoming_confirmations(self, confirmations: Dict):
-        pass
+        for receiver, receiver_confirmations in confirmations.items():
+            for confirmation_bundle in receiver_confirmations:
+                self.logger.info(f"Received confirmation from {receiver}")
+                otk_uuid, message_hash, hash_signature = confirmation_bundle
+
+                receiver_id_key = self.get_target_id_key(receiver)
+                signature_match = CryptoHelper.verify_signature_on_data_hash(receiver_id_key.public_key(),
+                                                                             bytes.fromhex(hash_signature),
+                                                                             message_hash.encode())
+                if not signature_match:
+                    raise Exception("Signature on message doesn't match receiver!")
+
+                sent_message_data = self.messages_sent.get(otk_uuid)
+                if not sent_message_data:
+                    self.logger.critical(f"Confirmation from {receiver} was received with an invalid UUID, skipping...")
+                    continue
+
+                saved_receiver, saved_message_hash = sent_message_data
+
+                if not saved_receiver == receiver:
+                    self.logger.critical(f"Error: message {otk_uuid} confirmations was received from wrong number!")
+                    continue
+
+                if not saved_message_hash == message_hash:
+                    self.logger.critical(f"Error: message {otk_uuid} was corrupted during delivery!")
+                    continue
+
+                self.logger.info(f"Message {otk_uuid} was delivered to {receiver} successfully")
+                self.messages_sent.pop(otk_uuid)
+
+    def confirm_received_message(self, sender, otk_uuid, message):
+        self.logger.info(f"Sending read confirmation for message ID - {otk_uuid}")
+        message_hash = CryptoHelper.hash_data_to_hex(message)
+        hash_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key, message_hash.encode()).hex()
+        self.server_api.server_confirm_message_read(sender, otk_uuid, message_hash, hash_signature)

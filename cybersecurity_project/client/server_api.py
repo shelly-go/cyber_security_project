@@ -10,7 +10,7 @@ from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, 
     API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD, ONETIME_KEY_UUID_FIELD, MESSAGE_PUBLIC_KEY_FIELD, \
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, PHONE_NUMBER_SIGNATURE_FIELD, MESSAGE_INCOMING_FIELD, \
-    MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX
+    MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX, MESSAGE_HASH_FIELD, API_ENDPOINT_MSG_CONFIRM
 from common.crypto import CryptoHelper
 
 
@@ -119,3 +119,19 @@ class ServerAPI:
         incoming_messages = response_data[MESSAGE_INCOMING_FIELD]
         incoming_confirmations = response_data[MESSAGE_CONF_INCOMING_FIELD]
         return incoming_messages, incoming_confirmations
+
+    def server_confirm_message_read(self, sender, otk_uuid, message_hash, hash_signature):
+        self.logger.info("Sending encrypted message")
+        request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
+                        TARGET_NUMBER_FIELD: sender,
+                        ONETIME_KEY_UUID_FIELD: otk_uuid,
+                        MESSAGE_HASH_FIELD: message_hash,
+                        MESSAGE_BUNDLE_SIGNATURE_FIELD: hash_signature}
+        response_data, response_code = self.request_handler.request(API_ENDPOINT_MSG_CONFIRM,
+                                                                    data=request_data)
+        if not response_code == HTTPStatus.OK:
+            self.logger.critical(
+                f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
+            exit(1)
+        return response_data[STATUS_FIELD] == STATUS_OK
+

@@ -16,6 +16,7 @@ TARGET_NUMBER_SIGNATURE_FIELD = 'target_number_signature'
 MESSAGE_PUBLIC_KEY_FIELD = 'public_session_key'
 MESSAGE_ENC_MESSAGE_FIELD = 'enc_message'
 MESSAGE_BUNDLE_SIGNATURE_FIELD = 'bundle_signature'
+MESSAGE_HASH_FIELD = 'message_hash'
 MESSAGE_INCOMING_FIELD = 'incoming_messages'
 MESSAGE_CONF_INCOMING_FIELD = 'incoming_message_confirmations'
 
@@ -38,6 +39,7 @@ API_ENDPOINT_USER_ID = "/usr/id"
 API_ENDPOINT_MSG_REQUEST = "/msg/request"
 API_ENDPOINT_MSG_SEND = "/msg/send"
 API_ENDPOINT_MSG_INBOX = "/msg/inbox"
+API_ENDPOINT_MSG_CONFIRM = "/msg/confirm"
 
 MAX_USERS = 10
 MAX_MSGS = 2
