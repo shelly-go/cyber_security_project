@@ -35,9 +35,7 @@ class RequestHandler:
 
     def request(self, endpoint='', data=None):
         try:
-            if not data:
-                data = b''
-            else:
+            if data:
                 data = json.dumps(data).encode()
 
             url = urljoin(self.server_url, endpoint)

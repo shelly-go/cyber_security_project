@@ -57,7 +57,19 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         return handler
 
     def do_GET(self):
-        raise NotImplementedError()
+        uri = self.extract_uri()
+        if not uri == API_ENDPOINT_ROOT:
+            self.send_response(HTTPStatus.NOT_FOUND)
+            data = {ERROR_FIELD: HTTPStatus.NOT_FOUND.phrase}
+        else:
+            self.send_response(HTTPStatus.OK)
+            data = STATUS_OK_RESPONSE
+
+        data = json.dumps(data).encode()
+        self.send_header("Content-type", 'application/json')
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
         uri = self.extract_uri()

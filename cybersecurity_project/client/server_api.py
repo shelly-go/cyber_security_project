@@ -12,7 +12,7 @@ from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, 
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, PHONE_NUMBER_SIGNATURE_FIELD, MESSAGE_INCOMING_FIELD, \
     MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX, MESSAGE_HASH_FIELD, API_ENDPOINT_MSG_CONFIRM, \
-    ONETIME_KEY_SHOULD_APPEND_FIELD, UNAVAILABLE_TIME_BETWEEN_ATTEMPTS, UNAVAILABLE_MAX_ATTEMPTS
+    ONETIME_KEY_SHOULD_APPEND_FIELD, UNAVAILABLE_TIME_BETWEEN_ATTEMPTS, UNAVAILABLE_MAX_ATTEMPTS, API_ENDPOINT_ROOT
 from common.crypto import CryptoHelper
 
 
@@ -22,6 +22,13 @@ class ServerAPI:
         self.server_certificate = self.request_handler.server_certificate
         self.client = client
         self.logger = logging.getLogger()
+
+    def server_check_online(self):
+        response_data, response_code = self.request_handler.request(API_ENDPOINT_ROOT, data=None)
+        if not response_code == HTTPStatus.OK:
+            self.logger.critical(
+                f"Error accessing server. error status: {response_code}. error data: {str(response_data)}")
+            exit(1)
 
     def server_request_otp(self):
         self.logger.info(f"Requesting OTP for {self.client.phone_num}")

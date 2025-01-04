@@ -45,6 +45,7 @@ class Client:
             id_key_cert = CryptoHelper.generate_id_cert_from_key(self.priv_id_key, self.pub_id_key, self.phone_num)
 
         self.client_id_keys.update({self.phone_num: id_key_cert})
+        self.server_api.server_check_online()
 
     def is_registered(self):
         return os.path.exists(self.pub_id_key_path) and os.path.exists(self.priv_id_key_path)
