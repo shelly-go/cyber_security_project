@@ -7,6 +7,7 @@ from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin
 
 from client.consts import SERVER_URL, SERVER_CERT_PATH
+from common.api_consts import ERROR_FIELD
 from common.crypto import CryptoHelper
 
 
@@ -43,13 +44,17 @@ class RequestHandler:
             response: HTTPResponse = request.urlopen(url, data=data, context=self.ssl_context)
             return json.loads(response.read()), response.status
         except HTTPError as e:
-            return {"error": e.msg}, e.status
+            error_data = json.loads(e.file.read().decode()) if e.file.length else {ERROR_FIELD: e.reason}
+            return error_data, e.status
         except URLError as e:
             if isinstance(e.reason, ssl.SSLCertVerificationError):
                 self.logger.critical("Server's certificate is not the one we have!")
                 exit(1)
+            elif isinstance(e.reason, ConnectionRefusedError):
+                self.logger.critical("Server is unreachable or offline!")
+                exit(1)
             else:
-                self.logger.critical(f"An error occurred while requesting: {e}")
+                self.logger.critical(f"A URL error occurred while requesting: {e}")
                 raise e
         except Exception as e:
             self.logger.critical(f"An error occurred while requesting: {e}")
