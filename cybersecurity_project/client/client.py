@@ -77,11 +77,11 @@ class Client:
 
         return priv_id_key, pub_id_key, id_key_cert
 
-    def generate_one_time_keys(self):
+    def generate_one_time_keys(self, number_of_keys=MAX_USERS * MAX_MSGS, should_append=False):
         self.logger.info("Creating One-time keys")
         pub_one_time_keys = dict()
         dh_parameters = CryptoHelper.dh_params_from_public_key(self.pub_id_key)
-        for _ in range(MAX_USERS * MAX_MSGS):
+        for _ in range(number_of_keys):
             otk_uuid = str(uuid.uuid4())
             private_otk = dh_parameters.generate_private_key()
             self.private_one_time_keys.update({otk_uuid: private_otk})
@@ -90,7 +90,7 @@ class Client:
                                                                                 public_otk_str.encode()).hex()
             pub_one_time_keys.update({otk_uuid: (public_otk_str, public_otk_signature)})
 
-        self.server_api.server_submit_otks(pub_one_time_keys)
+        self.server_api.server_submit_otks(pub_one_time_keys, should_append=should_append)
 
     def send_message(self, target, message):
         self.logger.info(f"Sending message: \"{message}\" to {target}")
@@ -230,9 +230,14 @@ class Client:
 
                 self.logger.info(f"Message {otk_uuid} was delivered to {receiver} successfully")
                 self.messages_sent.pop(otk_uuid)
+                self.regenerate_otk()
 
     def confirm_received_message(self, sender, otk_uuid, message):
         self.logger.info(f"Sending read confirmation for message ID - {otk_uuid}")
         message_hash = CryptoHelper.hash_data_to_hex(message)
         hash_signature = CryptoHelper.sign_data_hash_with_private_key(self.priv_id_key, message_hash.encode()).hex()
         self.server_api.server_confirm_message_read(sender, otk_uuid, message_hash, hash_signature)
+
+    def regenerate_otk(self):
+        self.logger.info(f"Replacing used One-time key")
+        self.generate_one_time_keys(number_of_keys=1, should_append=True)

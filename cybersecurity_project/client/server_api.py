@@ -10,7 +10,8 @@ from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, 
     API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD, ONETIME_KEY_UUID_FIELD, MESSAGE_PUBLIC_KEY_FIELD, \
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, PHONE_NUMBER_SIGNATURE_FIELD, MESSAGE_INCOMING_FIELD, \
-    MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX, MESSAGE_HASH_FIELD, API_ENDPOINT_MSG_CONFIRM
+    MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX, MESSAGE_HASH_FIELD, API_ENDPOINT_MSG_CONFIRM, \
+    ONETIME_KEY_SHOULD_APPEND_FIELD
 from common.crypto import CryptoHelper
 
 
@@ -49,10 +50,11 @@ class ServerAPI:
             exit(1)
         return response_data[STATUS_FIELD] == STATUS_OK
 
-    def server_submit_otks(self, pub_otk_dict):
+    def server_submit_otks(self, pub_otk_dict, should_append):
         self.logger.info("Submitting generated OTKs")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
-                        ONETIME_KEYS_FIELD: pub_otk_dict}
+                        ONETIME_KEYS_FIELD: pub_otk_dict,
+                        ONETIME_KEY_SHOULD_APPEND_FIELD: should_append}
         response_data, response_code = self.request_handler.request(API_ENDPOINT_USER_KEYS,
                                                                     data=request_data)
         if not response_code == HTTPStatus.OK:

@@ -9,6 +9,7 @@ ID_KEY_FIELD = 'id_key'
 ONETIME_KEYS_FIELD = 'one_time_keys'
 ONETIME_KEY_FIELD = 'one_time_key'
 ONETIME_KEY_UUID_FIELD = 'one_time_key_id'
+ONETIME_KEY_SHOULD_APPEND_FIELD = 'should_append_keys'
 
 TARGET_NUMBER_FIELD = 'target_number'
 TARGET_NUMBER_SIGNATURE_FIELD = 'target_number_signature'
