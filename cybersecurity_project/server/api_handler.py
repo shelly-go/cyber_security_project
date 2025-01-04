@@ -15,7 +15,7 @@ from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, API_ENDPOINT_MSG_INBOX, MESSAGE_INCOMING_FIELD, \
     MESSAGE_CONF_INCOMING_FIELD, PHONE_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_MSG_CONFIRM, MESSAGE_HASH_FIELD, \
-    ONETIME_KEY_SHOULD_APPEND_FIELD
+    ONETIME_KEY_SHOULD_APPEND_FIELD, MAX_MSGS
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -142,7 +142,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             raise Exception(f"Incorrect certificate for number {number}.")
 
         client_data.signed_id_key = self.__sign_certificate(id_key_cert)
-        client_data.otp_hash = None
+        client_data.otp_hash = ""
         self.api_clients.update_client(number, client_data)
         self.api_clients.save_client_id_key_to_file(number)
 
@@ -235,6 +235,9 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         if not target_data:
             raise Exception("Target number does not exist.")
 
+        if not target_data.one_time_keys or len(target_data.messages.get(number) or list()) >= MAX_MSGS:
+            self.send_response(HTTPStatus.TOO_MANY_REQUESTS)
+            return {ERROR_FIELD: "Too many messages"}
         otk_uuid, otk = target_data.one_time_keys.popitem()
         otk_signature = target_data.one_time_key_signatures.pop(otk_uuid)
         self.api_clients.update_client(target, target_data)

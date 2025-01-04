@@ -94,10 +94,13 @@ class Client:
 
     def send_message(self, target, message):
         self.logger.info(f"Sending message: \"{message}\" to {target}")
-        target_id_key = self.get_target_id_key(target)
-        target_otk_uuid, target_otk = self.get_target_otk(target, target_id_key)
-        session_pub_key_str, shared_ephemeral_key = self.generate_pub_key_and_ek(target_id_key, target_otk)
-        self.submit_encrypted_message(target, session_pub_key_str, shared_ephemeral_key, target_otk_uuid, message)
+        try:
+            target_id_key = self.get_target_id_key(target)
+            target_otk_uuid, target_otk = self.get_target_otk(target, target_id_key)
+            session_pub_key_str, shared_ephemeral_key = self.generate_pub_key_and_ek(target_id_key, target_otk)
+            self.submit_encrypted_message(target, session_pub_key_str, shared_ephemeral_key, target_otk_uuid, message)
+        except TimeoutError:
+            self.logger.error(f"Sending message to {target} failed! client is unreachable")
 
     def receive_messages(self):
         self.logger.info(f"Fetching all messages for {self.phone_num} from server")

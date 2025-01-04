@@ -1,5 +1,6 @@
 import logging
 from http import HTTPStatus
+from time import sleep
 
 from cryptography.x509 import Certificate
 
@@ -11,7 +12,7 @@ from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, 
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, PHONE_NUMBER_SIGNATURE_FIELD, MESSAGE_INCOMING_FIELD, \
     MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX, MESSAGE_HASH_FIELD, API_ENDPOINT_MSG_CONFIRM, \
-    ONETIME_KEY_SHOULD_APPEND_FIELD
+    ONETIME_KEY_SHOULD_APPEND_FIELD, UNAVAILABLE_TIME_BETWEEN_ATTEMPTS, UNAVAILABLE_MAX_ATTEMPTS
 from common.crypto import CryptoHelper
 
 
@@ -77,16 +78,24 @@ class ServerAPI:
         target_id_key = CryptoHelper.cert_from_str(response_data[ID_KEY_FIELD])
         return target_id_key
 
-    def server_request_target_otk(self, target, target_signature):
-        self.logger.info("Requesting target OTK")
+    def server_request_target_otk(self, target, target_signature, attempts=0):
+        if attempts >= UNAVAILABLE_MAX_ATTEMPTS:
+            self.logger.critical(f"Client {target} is unreachable")
+            raise TimeoutError()
+        self.logger.info(f"Requesting client {target} OTK")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         TARGET_NUMBER_FIELD: target,
                         TARGET_NUMBER_SIGNATURE_FIELD: target_signature}
         response_data, response_code = self.request_handler.request(API_ENDPOINT_MSG_REQUEST,
                                                                     data=request_data)
-        if not response_code == HTTPStatus.OK:
-            self.logger.critical(
-                f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
+        if response_code == HTTPStatus.TOO_MANY_REQUESTS:
+            self.logger.error(f"Client {target} is unavailable at the moment,"
+                              f" trying again in {UNAVAILABLE_TIME_BETWEEN_ATTEMPTS} seconds...")
+            sleep(UNAVAILABLE_TIME_BETWEEN_ATTEMPTS)
+            self.server_request_target_otk(target, target_signature, attempts + 1)
+        elif not response_code == HTTPStatus.OK:
+            self.logger.critical(f"Error requesting OTK. error status: "
+                                 f"{response_code}. error data: {str(response_data)}")
             exit(1)
         target_otk_uuid, target_otk, target_otk_signature = response_data[ONETIME_KEY_FIELD]
         return target_otk_uuid, target_otk, target_otk_signature
@@ -136,4 +145,3 @@ class ServerAPI:
                 f"Error requesting OTK. error status: {response_code}. error data: {str(response_data)}")
             exit(1)
         return response_data[STATUS_FIELD] == STATUS_OK
-
