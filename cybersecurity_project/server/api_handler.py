@@ -15,7 +15,7 @@ from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, API_ENDPOINT_MSG_INBOX, MESSAGE_INCOMING_FIELD, \
     MESSAGE_CONF_INCOMING_FIELD, PHONE_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_MSG_CONFIRM, MESSAGE_HASH_FIELD, \
-    ONETIME_KEY_SHOULD_APPEND_FIELD, MAX_MSGS
+    ONETIME_KEY_SHOULD_APPEND_FIELD, MAX_MSGS, MAX_USERS
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -106,6 +106,9 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         client_data = self.api_clients.get_client(number)
         if client_data and client_data.registration_complete:
             raise Exception("Phone number already exists.")
+
+        if self.api_clients.clients_amount >= MAX_USERS:
+            raise Exception("Too many clients are already registered.")
 
         otp = generate_otp()
         otp_hash = CryptoHelper.hash_data_to_hex(otp.encode())

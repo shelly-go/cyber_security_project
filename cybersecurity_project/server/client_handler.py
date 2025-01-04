@@ -41,6 +41,11 @@ class ClientHandler:
             self._dict_lock = threading.Lock()
             self.logger = logging.getLogger()
 
+    @property
+    def clients_amount(self):
+        with self._dict_lock:
+            return len(self.clients)
+
     def update_client(self, client_id, client_data):
         with self._dict_lock:
             self.logger.debug(f"Client {client_id} updated")
