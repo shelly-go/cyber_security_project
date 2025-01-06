@@ -59,7 +59,7 @@ class ServerAPI:
         return response_data[STATUS_FIELD] == STATUS_OK
 
     def server_submit_otks(self, pub_otk_dict, should_append):
-        self.logger.info("Submitting generated OTKs")
+        self.logger.debug("Submitting generated OTKs")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         ONETIME_KEYS_FIELD: pub_otk_dict,
                         ONETIME_KEY_SHOULD_APPEND_FIELD: should_append}
@@ -72,7 +72,7 @@ class ServerAPI:
         return response_data[STATUS_FIELD] == STATUS_OK
 
     def server_request_target_id_key(self, target, target_signature):
-        self.logger.info("Requesting target Id-Key")
+        self.logger.debug("Requesting target Id-Key")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         TARGET_NUMBER_FIELD: target,
                         TARGET_NUMBER_SIGNATURE_FIELD: target_signature}
@@ -89,7 +89,7 @@ class ServerAPI:
         if attempts >= UNAVAILABLE_MAX_ATTEMPTS:
             self.logger.critical(f"Client {target} is unreachable")
             raise TimeoutError()
-        self.logger.info(f"Requesting client {target} OTK")
+        self.logger.debug(f"Requesting client {target} OTK")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         TARGET_NUMBER_FIELD: target,
                         TARGET_NUMBER_SIGNATURE_FIELD: target_signature}
@@ -108,7 +108,7 @@ class ServerAPI:
         return target_otk_uuid, target_otk, target_otk_signature
 
     def server_submit_message_and_ek(self, target, target_otk_uuid, session_pub_key_str, enc_message, bundle_signature):
-        self.logger.info("Sending encrypted message")
+        self.logger.debug("Sending encrypted message")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         TARGET_NUMBER_FIELD: target,
                         ONETIME_KEY_UUID_FIELD: target_otk_uuid,
@@ -124,7 +124,7 @@ class ServerAPI:
         return response_data[STATUS_FIELD] == STATUS_OK
 
     def server_request_inbox(self, phone_num_signature):
-        self.logger.info("Sending inbox request")
+        self.logger.debug("Sending inbox request")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         PHONE_NUMBER_SIGNATURE_FIELD: phone_num_signature}
         response_data, response_code = self.request_handler.request(API_ENDPOINT_MSG_INBOX,
@@ -139,7 +139,7 @@ class ServerAPI:
         return incoming_messages, incoming_confirmations
 
     def server_confirm_message_read(self, sender, otk_uuid, message_hash, hash_signature):
-        self.logger.info("Sending encrypted message")
+        self.logger.debug("Sending message confirmation")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
                         TARGET_NUMBER_FIELD: sender,
                         ONETIME_KEY_UUID_FIELD: otk_uuid,
