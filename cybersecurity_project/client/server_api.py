@@ -39,9 +39,9 @@ class ServerAPI:
             self.logger.critical(
                 f"Error requesting OTP. error status: {response_code}. error data: {str(response_data)}")
             exit(1)
-        self.logger.info(f"OTP request for {self.client.phone_num} was sent")
+        self.logger.debug(f"OTP request for {self.client.phone_num} was sent")
         otp = response_data[OTP_FIELD]
-        self.logger.info(f"##########\nReceived via secure channel to {self.client.phone_num}: {otp}\n##########")
+        print(f"##########\nReceived via secure channel to {self.client.phone_num}: {otp}\n##########")
         return otp
 
     def server_submit_otp_with_id_key(self, otp, id_key_cert: Certificate):

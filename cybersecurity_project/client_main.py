@@ -14,7 +14,6 @@ def main():
     phone_num = input("Enter your phone number: ")
     client = Client(phone_num)
     client.set_up_communication()
-    client.generate_one_time_keys()
 
     def message_receiver():
         while True:

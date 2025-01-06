@@ -38,16 +38,18 @@ class Client:
         self.logger.setLevel(logging.DEBUG if on else logging.INFO)
 
     def set_up_communication(self):
+        self.server_api.server_check_online()
         if not self.is_registered():
             self.logger.info("Client is not registered yet, starting registration...")
             self.priv_id_key, self.pub_id_key, id_key_cert = self.register()
+            self.logger.info("Client is now registered")
         else:
             self.logger.info("Client is registered already, loading client identity...")
             self.priv_id_key, self.pub_id_key = self.load_keys()
             id_key_cert = CryptoHelper.generate_id_cert_from_key(self.priv_id_key, self.pub_id_key, self.phone_num)
 
         self.client_id_keys.update({self.phone_num: id_key_cert})
-        self.server_api.server_check_online()
+        self.generate_one_time_keys()
 
     def is_registered(self):
         return os.path.exists(self.pub_id_key_path) and os.path.exists(self.priv_id_key_path)
@@ -63,10 +65,10 @@ class Client:
     def register(self):
         key_dir = os.path.dirname(self.pub_id_key_path)
         if not os.path.exists(key_dir):
-            self.logger.info("Registration directory does not exist, creating...")
+            self.logger.debug("Registration directory does not exist, creating...")
             os.makedirs(key_dir)
 
-        self.logger.info("Creating Identity key pair")
+        self.logger.debug("Creating Identity key pair")
         priv_id_key, pub_id_key = CryptoHelper.generate_key_pair()
         id_key_cert = CryptoHelper.generate_id_cert_from_key(priv_id_key, pub_id_key, self.phone_num)
 
