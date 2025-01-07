@@ -73,7 +73,10 @@ class Client:
         id_key_cert = CryptoHelper.generate_id_cert_from_key(priv_id_key, pub_id_key, self.phone_num)
 
         otp = self.server_api.server_request_otp()
-        if not self.server_api.server_submit_otp_with_id_key(otp, id_key_cert):
+        shared_key_from_otp = CryptoHelper.key_from_shared_secret(shared_secret=otp.encode())
+        enc_id_key_cert = CryptoHelper.aes_encrypt_message(shared_key_from_otp,
+                                                           CryptoHelper.cert_to_str(id_key_cert).encode())
+        if not self.server_api.server_submit_otp_encrypted_id_key(enc_id_key_cert):
             self.logger.critical("Client cannot receive valid OTP from server, exiting...")
             exit(1)
 
@@ -159,14 +162,14 @@ class Client:
         client_session_dh_params = CryptoHelper.dh_params_from_public_key(target_id_key.public_key())
         session_priv_key = client_session_dh_params.generate_private_key()
         shared_secret = session_priv_key.exchange(target_otk)
-        shared_ephemeral_key = CryptoHelper.dh_get_key_from_shared_secret(shared_secret)
+        shared_ephemeral_key = CryptoHelper.key_from_shared_secret(shared_secret)
         session_pub_key_str = CryptoHelper.pub_key_to_str(session_priv_key.public_key())
         return session_pub_key_str, shared_ephemeral_key
 
     def generate_ek_from_otk(self, otk_uuid, target_pub_key):
         otk_secret = self.private_one_time_keys.pop(otk_uuid)
         shared_secret = otk_secret.exchange(target_pub_key)
-        shared_ephemeral_key = CryptoHelper.dh_get_key_from_shared_secret(shared_secret)
+        shared_ephemeral_key = CryptoHelper.key_from_shared_secret(shared_secret)
         return shared_ephemeral_key
 
     def submit_encrypted_message(self, target, session_pub_key_str, shared_ephemeral_key, target_otk_uuid, message):

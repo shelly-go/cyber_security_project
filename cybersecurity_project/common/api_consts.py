@@ -2,9 +2,9 @@ PHONE_NUMBER_FIELD = 'phone_number'
 PHONE_NUMBER_SIGNATURE_FIELD = 'phone_number_signature'
 
 OTP_FIELD = 'otp'
-OTP_HASH_FIELD = 'otp_hash'
 
 ID_KEY_FIELD = 'id_key'
+ENC_ID_KEY_FIELD = 'enc_id_key'
 
 ONETIME_KEYS_FIELD = 'one_time_keys'
 ONETIME_KEY_FIELD = 'one_time_key'

@@ -8,14 +8,14 @@ from urllib.parse import urlparse
 
 from cryptography.x509 import Certificate
 
-from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, OTP_HASH_FIELD, ID_KEY_FIELD, ONETIME_KEYS_FIELD, \
+from common.api_consts import PHONE_NUMBER_FIELD, OTP_FIELD, ID_KEY_FIELD, ONETIME_KEYS_FIELD, \
     API_ENDPOINT_REGISTER_VALIDATE, API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_ROOT, STATUS_OK_RESPONSE, ERROR_FIELD, \
     UNSPECIFIED_ERROR, API_ENDPOINT_USER_KEYS, API_ENDPOINT_USER_ID, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, \
     API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD, ONETIME_KEY_UUID_FIELD, MESSAGE_PUBLIC_KEY_FIELD, \
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, API_ENDPOINT_MSG_INBOX, MESSAGE_INCOMING_FIELD, \
     MESSAGE_CONF_INCOMING_FIELD, PHONE_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_MSG_CONFIRM, MESSAGE_HASH_FIELD, \
-    ONETIME_KEY_SHOULD_APPEND_FIELD, MAX_MSGS, MAX_USERS
+    ONETIME_KEY_SHOULD_APPEND_FIELD, MAX_MSGS, MAX_USERS, ENC_ID_KEY_FIELD
 from common.crypto import CryptoHelper
 from server.client_handler import ClientData, ClientHandler
 from server.consts import SSL_PRIV_KEY_PATH, ISSUER_NAME
@@ -123,8 +123,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             raise Exception("Too many clients are already registered.")
 
         otp = generate_otp()
-        otp_hash = CryptoHelper.hash_data_to_hex(otp.encode())
-        client_data = ClientData(phone_number=number, otp_hash=otp_hash)
+        client_data = ClientData(phone_number=number, otp=otp)
         self.api_clients.update_client(number, client_data)
 
         send_by_secure_channel(number, otp)
@@ -133,10 +132,9 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
 
     def api_register_otp(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
-        otp_hash = input_data.get(OTP_HASH_FIELD)
-        id_key = input_data.get(ID_KEY_FIELD)
-        if not (number and otp_hash) or not id_key:
-            raise Exception("Phone number, otp hash, and ID key are required.")
+        enc_id_key = input_data.get(ENC_ID_KEY_FIELD)
+        if not (number and enc_id_key):
+            raise Exception("Phone number and encrypted ID key are required.")
 
         client_data = self.api_clients.get_client(number)
         if not client_data:
@@ -145,19 +143,22 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         if client_data.registration_complete:
             raise Exception("Phone number is already registered.")
 
-        if client_data.otp_hash != otp_hash:
-            raise Exception(f"Incorrect otp for number {number}.")
-
         if client_data.phone_number != number:
             raise Exception(f"Incorrect otp for number {number}.")
 
-        id_key_cert = CryptoHelper.cert_from_str(id_key)
+        shared_key_from_otp = CryptoHelper.key_from_shared_secret(shared_secret=client_data.otp.encode())
+        id_key_cert_str = CryptoHelper.aes_decrypt_message(shared_key_from_otp, bytes.fromhex(enc_id_key)).decode()
+        try:
+            id_key_cert = CryptoHelper.cert_from_str(id_key_cert_str)
+        except Exception as e:
+            raise Exception(f"Incorrect OTP used to encrypt certificate for number {number}.")
 
-        if client_data.phone_number != CryptoHelper.user_id_from_cert(id_key_cert):
-            raise Exception(f"Incorrect certificate for number {number}.")
+        cert_number = CryptoHelper.user_id_from_cert(id_key_cert)
+        if client_data.phone_number != cert_number:
+            raise Exception(f"Certificate is issued to number {cert_number} instead of client number {number}.")
 
         client_data.signed_id_key = self.__sign_certificate(id_key_cert)
-        client_data.otp_hash = ""
+        client_data.otp = ""
         self.api_clients.update_client(number, client_data)
         self.api_clients.save_client_id_key_to_file(number)
 

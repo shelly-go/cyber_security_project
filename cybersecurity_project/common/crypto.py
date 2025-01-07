@@ -210,7 +210,7 @@ class CryptoHelper:
         return DHParameterNumbers(g=DH_GENERATOR, p=public_key.public_numbers().n).parameters()
 
     @staticmethod
-    def dh_get_key_from_shared_secret(shared_secret: bytes) -> bytes:
+    def key_from_shared_secret(shared_secret: bytes) -> bytes:
         return KDF_ALGO(algorithm=HASH_ALGO,
                         length=AES_KEY_SIZE_BITS // 8,
                         salt=None,

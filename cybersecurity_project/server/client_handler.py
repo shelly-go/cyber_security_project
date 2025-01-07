@@ -20,7 +20,7 @@ class ClientData:
     one_time_keys: Dict[str, RSAPublicKey] = None
     one_time_key_signatures: Dict[str, str] = None
 
-    otp_hash: str = None
+    otp: str = None
     registration_complete: bool = False
 
 

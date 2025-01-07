@@ -2,17 +2,16 @@ import logging
 from http import HTTPStatus
 from time import sleep
 
-from cryptography.x509 import Certificate
-
 from client.request_handler import RequestHandler
-from common.api_consts import OTP_HASH_FIELD, ID_KEY_FIELD, PHONE_NUMBER_FIELD, OTP_FIELD, \
+from common.api_consts import ID_KEY_FIELD, PHONE_NUMBER_FIELD, OTP_FIELD, \
     API_ENDPOINT_REGISTER_NUMBER, API_ENDPOINT_REGISTER_VALIDATE, STATUS_FIELD, STATUS_OK, ONETIME_KEYS_FIELD, \
     API_ENDPOINT_USER_KEYS, TARGET_NUMBER_FIELD, TARGET_NUMBER_SIGNATURE_FIELD, API_ENDPOINT_USER_ID, \
     API_ENDPOINT_MSG_REQUEST, ONETIME_KEY_FIELD, ONETIME_KEY_UUID_FIELD, MESSAGE_PUBLIC_KEY_FIELD, \
     MESSAGE_ENC_MESSAGE_FIELD, \
     MESSAGE_BUNDLE_SIGNATURE_FIELD, API_ENDPOINT_MSG_SEND, PHONE_NUMBER_SIGNATURE_FIELD, MESSAGE_INCOMING_FIELD, \
     MESSAGE_CONF_INCOMING_FIELD, API_ENDPOINT_MSG_INBOX, MESSAGE_HASH_FIELD, API_ENDPOINT_MSG_CONFIRM, \
-    ONETIME_KEY_SHOULD_APPEND_FIELD, UNAVAILABLE_TIME_BETWEEN_ATTEMPTS, UNAVAILABLE_MAX_ATTEMPTS, API_ENDPOINT_ROOT
+    ONETIME_KEY_SHOULD_APPEND_FIELD, UNAVAILABLE_TIME_BETWEEN_ATTEMPTS, UNAVAILABLE_MAX_ATTEMPTS, API_ENDPOINT_ROOT, \
+    ENC_ID_KEY_FIELD
 from common.crypto import CryptoHelper
 
 
@@ -44,12 +43,10 @@ class ServerAPI:
         print(f"##########\nReceived via secure channel to {self.client.phone_num}: {otp}\n##########")
         return otp
 
-    def server_submit_otp_with_id_key(self, otp, id_key_cert: Certificate):
-        self.logger.info("Submitting the received OTP")
-        otp_hash = CryptoHelper.hash_data_to_hex(otp.encode())
+    def server_submit_otp_encrypted_id_key(self, enc_id_key_cert: bytes):
+        self.logger.info("Authenticating using the received OTP")
         request_data = {PHONE_NUMBER_FIELD: self.client.phone_num,
-                        OTP_HASH_FIELD: otp_hash,
-                        ID_KEY_FIELD: CryptoHelper.cert_to_str(id_key_cert)}
+                        ENC_ID_KEY_FIELD: enc_id_key_cert.hex()}
         response_data, response_code = self.request_handler.request(API_ENDPOINT_REGISTER_VALIDATE,
                                                                     data=request_data)
         if not response_code == HTTPStatus.OK:
