@@ -4,18 +4,17 @@ from typing import Tuple
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import padding as symmetric_padding
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric.dh import DHParameters, DHParameterNumbers
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
-from cryptography.hazmat.primitives.ciphers import algorithms, Cipher, modes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 from cryptography.x509 import Certificate, load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
 
-from common.crypto_consts import HASH_ALGO, DH_GENERATOR
+from common.crypto_consts import HASH_ALGO, DH_GENERATOR, RSA_PADDING, AES_KEY_SIZE_BITS, RSA_KEY_SIZE_BITS, \
+    RSA_PUBLIC_EXPONENT, AES_ALGO, AES_PADDING, AES_MODE, KDF_ALGO
 
 logger = logging.getLogger()
 
@@ -26,8 +25,8 @@ class CryptoHelper:
     def generate_key_pair() -> Tuple[RSAPrivateKey, RSAPublicKey]:
         logger.debug("Generating new RSA private key")
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
+            public_exponent=RSA_PUBLIC_EXPONENT,
+            key_size=RSA_KEY_SIZE_BITS,
             backend=default_backend()
         )
         logger.debug("Getting RSA public key")
@@ -64,11 +63,9 @@ class CryptoHelper:
         public_key = cert_to_sign.public_key()
         logger.debug(f"Generating new certificate by {issuer_name} to sign certificate {subject.rfc4514_string()}")
 
-
         issuer = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, issuer_name)
         ])
-
 
         signed_cert = x509.CertificateBuilder().subject_name(
             subject
@@ -83,7 +80,7 @@ class CryptoHelper:
         ).not_valid_after(
             # Certificate valid for 1 year
             datetime.datetime.now() + datetime.timedelta(days=365)
-        ).sign(signer_private_key, HASH_ALGO, default_backend())
+        ).sign(signer_private_key, HASH_ALGO, default_backend(), rsa_padding=RSA_PADDING)
 
         return signed_cert
 
@@ -93,7 +90,7 @@ class CryptoHelper:
             public_key.verify(
                 signed_cert.signature,
                 signed_cert.tbs_certificate_bytes,
-                padding.PKCS1v15(),
+                RSA_PADDING,
                 signed_cert.signature_hash_algorithm
             )
             return True
@@ -184,9 +181,7 @@ class CryptoHelper:
     def sign_data_hash_with_private_key(private_key: RSAPrivateKey, data: bytes):
         hash_hex = CryptoHelper.hash_data_to_hex(data).encode()
         return private_key.sign(hash_hex,
-                                padding.PSS(
-                                    mgf=padding.MGF1(HASH_ALGO),
-                                    salt_length=padding.PSS.MAX_LENGTH),
+                                RSA_PADDING,
                                 HASH_ALGO)
 
     @staticmethod
@@ -195,9 +190,7 @@ class CryptoHelper:
         try:
             public_key.verify(signature,
                               hash_hex,
-                              padding.PSS(
-                                  mgf=padding.MGF1(HASH_ALGO),
-                                  salt_length=padding.PSS.MAX_LENGTH),
+                              RSA_PADDING,
                               HASH_ALGO)
             return True
         except Exception:
@@ -218,18 +211,18 @@ class CryptoHelper:
 
     @staticmethod
     def dh_get_key_from_shared_secret(shared_secret: bytes) -> bytes:
-        return HKDF(algorithm=HASH_ALGO,
-                    length=32,
-                    salt=None,
-                    info=None,
-                    backend=default_backend()).derive(shared_secret)
+        return KDF_ALGO(algorithm=HASH_ALGO,
+                        length=AES_KEY_SIZE_BITS // 8,
+                        salt=None,
+                        info=None,
+                        backend=default_backend()).derive(shared_secret)
 
     @staticmethod
     def aes_encrypt_message(key: bytes, plaintext: bytes):
-        pad = symmetric_padding.PKCS7(algorithms.AES.block_size).padder()
+        pad = AES_PADDING.padder()
         padded_plaintext = pad.update(plaintext) + pad.finalize()
 
-        cipher = Cipher(algorithms.AES(key), modes.CBC(key[:16]), backend=default_backend())
+        cipher = Cipher(AES_ALGO(key), AES_MODE(key[:16]), backend=default_backend())
         encryptor = cipher.encryptor()
 
         ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
@@ -237,12 +230,12 @@ class CryptoHelper:
 
     @staticmethod
     def aes_decrypt_message(key: bytes, ciphertext: bytes):
-        cipher = Cipher(algorithms.AES(key), modes.CBC(key[:16]), backend=default_backend())
+        cipher = Cipher(AES_ALGO(key), AES_MODE(key[:16]), backend=default_backend())
         decryptor = cipher.decryptor()
 
         padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
 
-        unpad = symmetric_padding.PKCS7(algorithms.AES.block_size).unpadder()
+        unpad = AES_PADDING.unpadder()
         plaintext = unpad.update(padded_plaintext) + unpad.finalize()
 
         return plaintext
