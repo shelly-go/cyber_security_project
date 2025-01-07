@@ -2,7 +2,7 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import Dict
 
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.x509 import Certificate
@@ -14,14 +14,13 @@ from server.consts import SERVER_ID_KEY_DIR, SERVER_SIGNED_ID_KEY_PATH, SERVER_I
 @dataclass
 class ClientData:
     phone_number: str
+    otp: str
+    signed_id_key: Certificate = None
+    registration_complete: bool = False
     messages: Dict[str, tuple] = None
     confirmations: Dict[str, tuple] = None
-    signed_id_key: Certificate = None
     one_time_keys: Dict[str, RSAPublicKey] = None
     one_time_key_signatures: Dict[str, str] = None
-
-    otp: str = None
-    registration_complete: bool = False
 
 
 class ClientHandler:
@@ -86,4 +85,3 @@ class ClientHandler:
                             self.logger.debug(f"Certificate not found for client {client_id}")
             else:
                 self.logger.debug(f"No registered clients found.")
-

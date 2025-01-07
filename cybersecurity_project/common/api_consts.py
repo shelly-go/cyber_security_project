@@ -21,7 +21,6 @@ MESSAGE_HASH_FIELD = 'message_hash'
 MESSAGE_INCOMING_FIELD = 'incoming_messages'
 MESSAGE_CONF_INCOMING_FIELD = 'incoming_message_confirmations'
 
-
 STATUS_FIELD = 'status'
 ERROR_FIELD = 'error'
 

@@ -1,7 +1,7 @@
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import padding as symmetric_padding
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers import algorithms, modes
-from cryptography.hazmat.primitives import padding as symmetric_padding
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 HASH_ALGO = hashes.SHA256()
