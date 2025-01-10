@@ -58,6 +58,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         uri = self.extract_uri()
+        self.logger.info(f"Received API get request for {uri}")
         if not uri == API_ENDPOINT_ROOT:
             self.send_response(HTTPStatus.NOT_FOUND)
             data = {ERROR_FIELD: HTTPStatus.NOT_FOUND.phrase}
@@ -73,7 +74,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         uri = self.extract_uri()
-        self.logger.info(f"Received API request for {uri}")
+        self.logger.info(f"Received API post request for {uri}")
         handler = self.find_request_api_handler(uri=uri)
 
         data_json = None
@@ -112,6 +113,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
 
     def api_register_number(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
+        self.logger.info(f"Attempting to register number: {number}")
         if not number:
             raise Exception("Phone number is required for registration")
 
@@ -125,6 +127,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         otp = generate_otp()
         client_data = ClientData(phone_number=number, otp=otp)
         self.api_clients.update_client(number, client_data)
+        self.logger.info(f"Set otp: {otp} for client: {number}")
 
         send_by_secure_channel(number, otp)
         self.send_response(HTTPStatus.OK)
@@ -133,6 +136,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
     def api_register_otp(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
         enc_id_key = input_data.get(ENC_ID_KEY_FIELD)
+        self.logger.info(f"Attempting to validate OTP for client: {number}")
         if not (number and enc_id_key):
             raise Exception("Phone number and encrypted ID key are required.")
 
@@ -162,6 +166,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.api_clients.update_client(number, client_data)
         self.api_clients.save_client_id_key_to_file(number)
 
+        self.logger.info(f"OTP successfully validated for client: {number}. Sending certificate.")
         self.send_response(HTTPStatus.OK)
         return STATUS_OK_RESPONSE
 
@@ -170,6 +175,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         onetime_keys = input_data.get(ONETIME_KEYS_FIELD)
         should_append = input_data.get(ONETIME_KEY_SHOULD_APPEND_FIELD)
 
+        self.logger.info(f"Setting keys for client: {number}")
         if not (number and onetime_keys):
             raise Exception("Phone number and one-time keys are required.")
 
@@ -181,6 +187,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         one_time_key_signatures_dict = client_data.one_time_key_signatures or dict() if should_append else dict()
 
         for uuid, key_data in onetime_keys.items():
+            self.logger.info(f"Processing key for number: {number} with uuid: {uuid}")
             otk_public_key_str, otk_signature_str = key_data
             signature_match = CryptoHelper.verify_signature_on_data_hash(client_data.signed_id_key.public_key(),
                                                                          bytes.fromhex(otk_signature_str),
@@ -195,6 +202,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         client_data.one_time_key_signatures = one_time_key_signatures_dict
 
         if not client_data.registration_complete:
+            self.logger.info(f"Finished registration for client: {number}")
             client_data.registration_complete = True
             client_data.messages = dict()
             client_data.confirmations = dict()
@@ -209,6 +217,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         target = input_data.get(TARGET_NUMBER_FIELD)
         target_signature = input_data.get(TARGET_NUMBER_SIGNATURE_FIELD)
 
+        self.logger.info(f"Getting signed ID key of client: {target} for client: {number}")
         if not (number and target and target_signature):
             raise Exception("Phone number, target and signature are required.")
 
@@ -234,6 +243,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         target = input_data.get(TARGET_NUMBER_FIELD)
         target_signature = input_data.get(TARGET_NUMBER_SIGNATURE_FIELD)
 
+        self.logger.info(f"Getting one time key of client: {target} for client: {number}")
         if not (number and target and target_signature):
             raise Exception("Phone number, target and signature are required.")
 
@@ -257,6 +267,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         otk_uuid, otk = target_data.one_time_keys.popitem()
         otk_signature = target_data.one_time_key_signatures.pop(otk_uuid)
         self.api_clients.update_client(target, target_data)
+        self.logger.info(f"Successfully acquired key with uuid: {otk_uuid} for client: {number}")
 
         self.send_response(HTTPStatus.OK)
         return {TARGET_NUMBER_FIELD: number,
@@ -270,6 +281,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         enc_message = input_data.get(MESSAGE_ENC_MESSAGE_FIELD)
         bundle_signature = input_data.get(MESSAGE_BUNDLE_SIGNATURE_FIELD)
 
+        self.logger.info(f"Sending message from: {sender_number} to: {target}")
         if not (
                 sender_number and target and target_otk_uuid and session_pub_key_str and enc_message and bundle_signature):
             raise Exception("Phone number, target, OTK UUID, Session key, encrypted message and signature are required")
@@ -294,12 +306,14 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         receiver_data.messages.update({sender_number: outgoing_sender_messages})
         self.api_clients.update_client(target, receiver_data)
 
+        self.logger.info(f"Message with uuid: {target_otk_uuid} for client: {target} successfully sent.")
         self.send_response(HTTPStatus.OK)
         return STATUS_OK_RESPONSE
 
     def api_message_inbox(self, input_data: Dict) -> Dict:
         number = input_data.get(PHONE_NUMBER_FIELD)
         number_signature = input_data.get(PHONE_NUMBER_SIGNATURE_FIELD)
+        self.logger.info(f"Getting messages in inbox for client: {number}")
 
         if not (number and number_signature):
             raise Exception("Phone number and signature are required.")
@@ -315,6 +329,8 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
             raise Exception("Signature on target doesn't match client!")
 
         self.send_response(HTTPStatus.OK)
+        self.logger.info(f"There are {len(client_data.messages)} messages and {len(client_data.confirmations)} "
+                         f"confirmations waiting for client {number}.")
         response = {MESSAGE_INCOMING_FIELD: client_data.messages,
                     MESSAGE_CONF_INCOMING_FIELD: client_data.confirmations}
 
@@ -330,6 +346,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         message_hash = input_data.get(MESSAGE_HASH_FIELD)
         hash_signature = input_data.get(MESSAGE_BUNDLE_SIGNATURE_FIELD)
 
+        self.logger.info(f"Sending confirmation for message with uuid: {sender_otk_uuid}")
         if not (number and sender_number and sender_otk_uuid and message_hash and hash_signature):
             raise Exception("Phone number, sender, OTK UUID, message_hash and signature are required")
 
@@ -358,5 +375,6 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         self.api_clients.update_client(sender_number, sender_data)
         self.api_clients.update_client(number, client_data)
 
+        self.logger.info(f"Confirmation for message with uuid: {sender_otk_uuid} sent.")
         self.send_response(HTTPStatus.OK)
         return STATUS_OK_RESPONSE
